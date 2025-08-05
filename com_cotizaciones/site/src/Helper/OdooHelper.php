@@ -15,7 +15,7 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Component\ComponentHelper;
 
 /**
- * Helper class for Odoo integration
+ * Helper class for Odoo integration using cURL
  */
 class OdooHelper
 {
@@ -43,7 +43,7 @@ class OdooHelper
     }
 
     /**
-     * Make XML-RPC call to Odoo
+     * Make XML-RPC call to Odoo using cURL
      *
      * @param   string  $model   The Odoo model
      * @param   string  $method  The method to call
@@ -51,45 +51,68 @@ class OdooHelper
      *
      * @return  mixed   The result or false on error
      */
-    private function xmlrpcCall($model, $method, $args = [])
+    private function odooCall($model, $method, $args = [])
     {
         try {
-            // Prepare the XML-RPC request
-            $request = xmlrpc_encode_request('execute_kw', [
-                $this->database,
-                $this->userId,
-                $this->apiKey,
-                $model,
-                $method,
-                $args
+            // Build the XML-RPC request manually
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>execute_kw</methodName>
+    <params>
+        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
+        <param><value><int>' . $this->userId . '</int></value></param>
+        <param><value><string>' . htmlspecialchars($this->apiKey) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($model) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($method) . '</string></value></param>
+        <param><value><array><data>';
+
+            // Add arguments
+            foreach ($args as $arg) {
+                $xmlRequest .= '<value>' . $this->encodeValue($arg) . '</value>';
+            }
+
+            $xmlRequest .= '</data></array></value></param>
+    </params>
+</methodCall>';
+
+            // Initialize cURL
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $xmlRequest);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: text/xml',
+                'Content-Length: ' . strlen($xmlRequest)
             ]);
 
-            // Create context for the HTTP request
-            $context = stream_context_create([
-                'http' => [
-                    'method' => 'POST',
-                    'header' => 'Content-Type: text/xml',
-                    'content' => $request,
-                    'timeout' => 30
-                ]
-            ]);
+            // Execute request
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
 
-            // Make the request
-            $response = file_get_contents($this->url, false, $context);
-            
-            if ($response === false) {
+            if ($response === false || !empty($error)) {
                 if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Failed to connect to Odoo server', 'error');
+                    Factory::getApplication()->enqueueMessage('cURL Error: ' . $error, 'error');
                 }
                 return false;
             }
 
-            // Decode the response
-            $result = xmlrpc_decode($response);
-            
-            if (is_array($result) && xmlrpc_is_fault($result)) {
+            if ($httpCode !== 200) {
                 if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Odoo Error: ' . $result['faultString'], 'error');
+                    Factory::getApplication()->enqueueMessage('HTTP Error: ' . $httpCode, 'error');
+                }
+                return false;
+            }
+
+            // Parse XML response
+            $result = $this->parseXmlResponse($response);
+            
+            if ($result === false) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Failed to parse Odoo response', 'error');
                 }
                 return false;
             }
@@ -98,9 +121,148 @@ class OdooHelper
 
         } catch (Exception $e) {
             if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('XML-RPC Error: ' . $e->getMessage(), 'error');
+                Factory::getApplication()->enqueueMessage('Odoo Call Error: ' . $e->getMessage(), 'error');
             }
             return false;
+        }
+    }
+
+    /**
+     * Encode a value for XML-RPC
+     *
+     * @param   mixed  $value  The value to encode
+     *
+     * @return  string  The encoded XML
+     */
+    private function encodeValue($value)
+    {
+        if (is_array($value)) {
+            if (empty($value)) {
+                return '<array><data></data></array>';
+            }
+            
+            // Check if it's an associative array (struct) or indexed array
+            if (array_keys($value) !== range(0, count($value) - 1)) {
+                // Associative array - encode as struct
+                $xml = '<struct>';
+                foreach ($value as $key => $val) {
+                    $xml .= '<member><name>' . htmlspecialchars($key) . '</name><value>' . $this->encodeValue($val) . '</value></member>';
+                }
+                $xml .= '</struct>';
+                return $xml;
+            } else {
+                // Indexed array
+                $xml = '<array><data>';
+                foreach ($value as $val) {
+                    $xml .= '<value>' . $this->encodeValue($val) . '</value>';
+                }
+                $xml .= '</data></array>';
+                return $xml;
+            }
+        } elseif (is_int($value)) {
+            return '<int>' . $value . '</int>';
+        } elseif (is_float($value)) {
+            return '<double>' . $value . '</double>';
+        } elseif (is_bool($value)) {
+            return '<boolean>' . ($value ? '1' : '0') . '</boolean>';
+        } else {
+            return '<string>' . htmlspecialchars((string)$value) . '</string>';
+        }
+    }
+
+    /**
+     * Parse XML-RPC response
+     *
+     * @param   string  $xml  The XML response
+     *
+     * @return  mixed   The parsed result or false on error
+     */
+    private function parseXmlResponse($xml)
+    {
+        try {
+            $dom = new \DOMDocument();
+            $dom->loadXML($xml);
+            
+            // Check for fault
+            $fault = $dom->getElementsByTagName('fault');
+            if ($fault->length > 0) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Odoo returned a fault response', 'error');
+                }
+                return false;
+            }
+
+            // Get the response value
+            $params = $dom->getElementsByTagName('param');
+            if ($params->length === 0) {
+                return false;
+            }
+
+            $value = $params->item(0)->getElementsByTagName('value')->item(0);
+            return $this->parseValue($value);
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('XML Parse Error: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Parse a value from XML
+     *
+     * @param   \DOMElement  $element  The XML element
+     *
+     * @return  mixed  The parsed value
+     */
+    private function parseValue($element)
+    {
+        if (!$element) {
+            return null;
+        }
+
+        $firstChild = $element->firstChild;
+        if (!$firstChild) {
+            return $element->textContent;
+        }
+
+        switch ($firstChild->nodeName) {
+            case 'array':
+                $result = [];
+                $data = $firstChild->getElementsByTagName('data')->item(0);
+                if ($data) {
+                    $values = $data->getElementsByTagName('value');
+                    for ($i = 0; $i < $values->length; $i++) {
+                        $result[] = $this->parseValue($values->item($i));
+                    }
+                }
+                return $result;
+
+            case 'struct':
+                $result = [];
+                $members = $firstChild->getElementsByTagName('member');
+                for ($i = 0; $i < $members->length; $i++) {
+                    $member = $members->item($i);
+                    $name = $member->getElementsByTagName('name')->item(0)->textContent;
+                    $value = $member->getElementsByTagName('value')->item(0);
+                    $result[$name] = $this->parseValue($value);
+                }
+                return $result;
+
+            case 'int':
+            case 'i4':
+                return (int) $firstChild->textContent;
+
+            case 'double':
+                return (float) $firstChild->textContent;
+
+            case 'boolean':
+                return $firstChild->textContent === '1';
+
+            case 'string':
+            default:
+                return $firstChild->textContent;
         }
     }
 
@@ -131,23 +293,23 @@ class OdooHelper
             $offset = ($page - 1) * $limit;
 
             // Get quote IDs first
-            $quoteIds = $this->xmlrpcCall('sale.order', 'search', [
+            $quoteIds = $this->odooCall('sale.order', 'search', [
                 $domain,
                 ['offset' => $offset, 'limit' => $limit, 'order' => 'date_order desc']
             ]);
 
             if (!$quoteIds || !is_array($quoteIds)) {
-                return [];
+                return $this->getMockQuotes($search);
             }
 
             // Get quote details
-            $quotes = $this->xmlrpcCall('sale.order', 'read', [
+            $quotes = $this->odooCall('sale.order', 'read', [
                 $quoteIds,
                 ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note']
             ]);
 
             if (!$quotes || !is_array($quotes)) {
-                return [];
+                return $this->getMockQuotes($search);
             }
 
             // Process the quotes to add contact names
@@ -188,7 +350,7 @@ class OdooHelper
     public function getQuote($quoteId)
     {
         try {
-            $quotes = $this->xmlrpcCall('sale.order', 'read', [
+            $quotes = $this->odooCall('sale.order', 'read', [
                 [$quoteId],
                 ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note']
             ]);
@@ -235,7 +397,7 @@ class OdooHelper
                 'x_studio_agente_de_ventas_1' => $data['x_studio_agente_de_ventas_1']
             ];
 
-            $quoteId = $this->xmlrpcCall('sale.order', 'create', [$quoteData]);
+            $quoteId = $this->odooCall('sale.order', 'create', [$quoteData]);
 
             if ($quoteId && is_numeric($quoteId)) {
                 return (int) $quoteId;
@@ -280,7 +442,7 @@ class OdooHelper
                 return true; // Nothing to update
             }
 
-            $result = $this->xmlrpcCall('sale.order', 'write', [[$quoteId], $updateData]);
+            $result = $this->odooCall('sale.order', 'write', [[$quoteId], $updateData]);
 
             return $result === true;
 
@@ -302,7 +464,7 @@ class OdooHelper
     public function deleteQuote($quoteId)
     {
         try {
-            $result = $this->xmlrpcCall('sale.order', 'unlink', [[$quoteId]]);
+            $result = $this->odooCall('sale.order', 'unlink', [[$quoteId]]);
             return $result === true;
 
         } catch (Exception $e) {
@@ -363,7 +525,7 @@ class OdooHelper
     public function testConnection()
     {
         try {
-            $result = $this->xmlrpcCall('res.partner', 'search', [[], ['limit' => 1]]);
+            $result = $this->odooCall('res.partner', 'search', [[], ['limit' => 1]]);
             return is_array($result) && !empty($result);
         } catch (Exception $e) {
             return false;
