@@ -78,6 +78,15 @@ class HtmlView extends BaseHtmlView
             $this->pagination = $this->get('Pagination');
             $this->state = $this->get('State');
             $this->params = ComponentHelper::getParams('com_cotizaciones');
+            
+            // Test Odoo connection and show status
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            if (!$helper->testConnection()) {
+                Factory::getApplication()->enqueueMessage(
+                    'Advertencia: No se pudo conectar con Odoo. Mostrando datos de ejemplo.', 
+                    'warning'
+                );
+            }
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults
             $this->items = [];
