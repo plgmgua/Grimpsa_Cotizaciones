@@ -220,6 +220,10 @@ function getStateLabel($state) {
                                         <?php if (!empty($this->distinctClients) && is_array($this->distinctClients)): ?>
                                             <?php 
                                             $selectedClients = $this->state->get('filter.clients', []);
+                                            // Debug output - remove this after testing
+                                            if (Factory::getApplication()->get('debug', 0)) {
+                                                Factory::getApplication()->enqueueMessage('Distinct clients count: ' . count($this->distinctClients), 'info');
+                                            }
                                             foreach ($this->distinctClients as $client): 
                                                 if (!is_array($client) || empty($client['id']) || empty($client['name'])) continue;
                                                 $isSelected = in_array($client['id'], $selectedClients);
@@ -235,7 +239,12 @@ function getStateLabel($state) {
                                                 </div>
                                             <?php endforeach; ?>
                                         <?php else: ?>
-                                            <div class="text-muted">No hay clientes disponibles</div>
+                                            <div class="text-muted">
+                                                No hay clientes disponibles
+                                                <?php if (Factory::getApplication()->get('debug', 0)): ?>
+                                                    <br><small>Debug: distinctClients = <?php echo json_encode($this->distinctClients); ?></small>
+                                                <?php endif; ?>
+                                            </div>
                                         <?php endif; ?>
                                     </div>
                                 </div>
