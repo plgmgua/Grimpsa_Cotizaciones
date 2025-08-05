@@ -204,7 +204,7 @@ function getStateLabel($state) {
             </table>
             
             <!-- Pagination -->
-            <?php if ($this->pagination && $this->pagination->getPagesTotal() > 1): ?>
+            <?php if ($this->pagination && $this->pagination->pagesTotal > 1): ?>
                 <div class="d-flex justify-content-center mt-4">
                     <?php echo $this->pagination->getListFooter(); ?>
                 </div>

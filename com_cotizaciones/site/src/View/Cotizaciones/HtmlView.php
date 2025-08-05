@@ -81,7 +81,7 @@ class HtmlView extends BaseHtmlView
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults
             $this->items = [];
-            $this->pagination = new \Joomla\CMS\Pagination\Pagination(0, 0, 20);
+            $this->pagination = null;
             $this->state = new \Joomla\Registry\Registry();
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
@@ -93,7 +93,7 @@ class HtmlView extends BaseHtmlView
         if (count($errors = $this->get('Errors'))) {
             Factory::getApplication()->enqueueMessage(implode("\n", $errors), 'error');
             $this->items = [];
-            $this->pagination = new \Joomla\CMS\Pagination\Pagination(0, 0, 20);
+            $this->pagination = null;
             $this->state = new \Joomla\Registry\Registry();
         }
 
