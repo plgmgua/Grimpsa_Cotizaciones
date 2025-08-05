@@ -79,13 +79,29 @@ class HtmlView extends BaseHtmlView
             $this->state = $this->get('State');
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
-            // Test Odoo connection and show status
+            // Test Odoo connection and show detailed status
             $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            if (!$helper->testConnection()) {
-                Factory::getApplication()->enqueueMessage(
-                    'Advertencia: No se pudo conectar con Odoo. Mostrando datos de ejemplo.', 
-                    'warning'
-                );
+            
+            // Get connection status for debugging
+            $connectionStatus = $helper->getConnectionStatus();
+            
+            if (!$connectionStatus['connection_test']) {
+                $message = 'Advertencia: No se pudo conectar con Odoo. Mostrando datos de ejemplo.';
+                
+                // Add debug info if debug mode is enabled
+                if ($this->params->get('enable_debug', 0)) {
+                    $message .= '<br><strong>Debug Info:</strong><br>';
+                    $message .= 'URL: ' . $connectionStatus['url'] . '<br>';
+                    $message .= 'Database: ' . $connectionStatus['database'] . '<br>';
+                    $message .= 'User ID: ' . $connectionStatus['user_id'] . '<br>';
+                    $message .= 'API Key Set: ' . ($connectionStatus['api_key_set'] ? 'Yes' : 'No') . '<br>';
+                    $message .= 'cURL Available: ' . ($connectionStatus['curl_available'] ? 'Yes' : 'No') . '<br>';
+                    if (!empty($connectionStatus['error_message'])) {
+                        $message .= 'Error: ' . $connectionStatus['error_message'];
+                    }
+                }
+                
+                Factory::getApplication()->enqueueMessage($message, 'warning');
             }
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults

@@ -525,10 +525,60 @@ class OdooHelper
     public function testConnection()
     {
         try {
+            // First test a simple search to verify connection
             $result = $this->odooCall('res.partner', 'search', [[], ['limit' => 1]]);
-            return is_array($result) && !empty($result);
+            
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Connection test result: ' . print_r($result, true), 'info');
+            }
+            
+            return is_array($result);
         } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Connection test failed: ' . $e->getMessage(), 'error');
+            }
             return false;
         }
+    }
+
+    /**
+     * Get detailed connection status for debugging
+     *
+     * @return  array  Connection status details
+     */
+    public function getConnectionStatus()
+    {
+        $status = [
+            'url' => $this->url,
+            'database' => $this->database,
+            'user_id' => $this->userId,
+            'api_key_set' => !empty($this->apiKey),
+            'curl_available' => function_exists('curl_init'),
+            'connection_test' => false,
+            'error_message' => ''
+        ];
+
+        try {
+            // Test basic cURL functionality
+            $ch = curl_init();
+            if (!$ch) {
+                $status['error_message'] = 'cURL initialization failed';
+                return $status;
+            }
+            curl_close($ch);
+
+            // Test Odoo connection
+            $result = $this->testConnection();
+            $status['connection_test'] = $result;
+            
+            if (!$result) {
+                $status['error_message'] = 'Odoo connection test failed';
+            }
+
+        } catch (Exception $e) {
+            $status['error_message'] = $e->getMessage();
+        }
+
+        return $status;
     }
 }
