@@ -93,17 +93,18 @@ class CotizacionController extends FormController
         $model = $this->getModel('Cotizacion');
         $data = $this->input->post->get('jform', [], 'array');
         
-        // Handle quote lines for new quotes
-        $quoteLinesData = $this->input->post->getString('quote_lines', '');
-        if (!empty($quoteLinesData)) {
-            $quoteLines = json_decode($quoteLinesData, true);
-            if (is_array($quoteLines)) {
-                $data['quote_lines'] = $quoteLines;
-            }
-        }
-        
         // Ensure the sales agent field is always set
         $data['x_studio_agente_de_ventas_1'] = $user->name;
+        
+        // Handle quote lines for new quotes
+        $quoteLinesJson = $this->input->post->getString('quote_lines_data', '');
+        $quoteLines = [];
+        if (!empty($quoteLinesJson)) {
+            $quoteLines = json_decode($quoteLinesJson, true);
+            if (!is_array($quoteLines)) {
+                $quoteLines = [];
+            }
+        }
         
         // Debug logging if enabled
         if ($this->app->get('debug', 0)) {
@@ -118,16 +119,68 @@ class CotizacionController extends FormController
         try {
             if ($quoteId > 0) {
                 $result = $model->updateQuote($quoteId, $data);
+                
+                // Handle quote lines for existing quotes
+                if (!empty($quoteLines)) {
+                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+                    foreach ($quoteLines as $line) {
+                        if (isset($line['is_new']) && $line['is_new']) {
+                            // Create product first
+                            $productId = $helper->createProduct(
+                                $line['description'],
+                                'PROD-' . $line['product_code'],
+                                (float)$line['price']
+                            );
+                            
+                            // Create quote line
+                            $helper->createQuoteLine(
+                                $quoteId,
+                                $productId,
+                                $line['description'],
+                                (float)$line['quantity'],
+                                (float)$line['price']
+                            );
+                        }
+                    }
+                }
+                
                 $message = 'Cotización actualizada exitosamente';
             } else {
                 $result = $model->createQuote($data);
+                
+                if ($result !== false) {
+                    $quoteId = $result;
+                    
+                    // Handle quote lines for new quotes
+                    if (!empty($quoteLines)) {
+                        $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+                        foreach ($quoteLines as $line) {
+                            // Create product first
+                            $productId = $helper->createProduct(
+                                $line['description'],
+                                'PROD-' . $line['product_code'],
+                                (float)$line['price']
+                            );
+                            
+                            // Create quote line
+                            $helper->createQuoteLine(
+                                $quoteId,
+                                $productId,
+                                $line['description'],
+                                (float)$line['quantity'],
+                                (float)$line['price']
+                            );
+                        }
+                    }
+                }
+                
                 $message = 'Cotización creada exitosamente';
-                $quoteId = $result;
             }
 
             if ($result !== false) {
                 $this->app->enqueueMessage($message, 'success');
-                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
+                // Redirect to edit the created/updated quote
+                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
             } else {
                 $this->app->enqueueMessage('Error al guardar la cotización', 'error');
                 $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));

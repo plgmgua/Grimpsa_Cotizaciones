@@ -377,6 +377,7 @@
     padding: 12px;
     cursor: pointer;
     border-bottom: 1px solid #f8f9fa;
+    transition: background-color 0.2s ease;
 }
 
 .client-result-item:hover {
@@ -391,9 +392,17 @@
     margin-top: 10px;
 }
 
+.selected-client .alert {
+    margin-bottom: 0;
+}
+
 /* Quote Lines Styles */
 .add-line-form {
     margin-top: 20px;
+}
+
+.add-line-form .card {
+    border-color: #28a745;
 }
 
 .quote-lines-table {
@@ -406,11 +415,13 @@
     font-weight: 600;
     border: none;
     padding: 12px;
+    font-size: 0.9rem;
 }
 
 .quote-lines-table td {
     padding: 12px;
     vertical-align: middle;
+    font-size: 0.9rem;
 }
 
 .quote-lines-table tbody tr:hover {
@@ -424,12 +435,43 @@
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.8rem;
+    font-weight: 600;
 }
 
 /* Currency formatting */
 .currency-amount {
     font-weight: 600;
     color: #28a745;
+}
+
+/* Character counter */
+.form-text small {
+    font-size: 0.8rem;
+}
+
+#char_count {
+    font-weight: 600;
+}
+
+/* Form validation */
+.form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.form-control.is-valid {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+/* Button improvements */
+.btn-group .btn {
+    border-radius: 4px;
+    margin-bottom: 2px;
+}
+
+.btn-group .btn:not(:last-child) {
+    margin-right: 2px;
 }
 
 /* Loading states */

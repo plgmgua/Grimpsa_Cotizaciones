@@ -319,6 +319,57 @@ class OdooHelper
     }
 
     /**
+     * Search for clients by name
+     *
+     * @param   string  $searchTerm  The search term
+     * @param   int     $limit       Maximum number of results
+     *
+     * @return  array  Array of clients
+     */
+    public function searchClients($searchTerm, $limit = 20)
+    {
+        try {
+            $models = $this->getModelsConnection();
+            
+            // Search for clients using ilike (case-insensitive partial match)
+            $domain = [
+                ['name', 'ilike', $searchTerm],
+                ['is_company', '=', true] // Only companies
+            ];
+            
+            $clientIds = $models->execute_kw(
+                $this->database,
+                $this->userId,
+                $this->password,
+                'res.partner',
+                'search',
+                [$domain],
+                ['limit' => $limit]
+            );
+            
+            if (empty($clientIds)) {
+                return [];
+            }
+            
+            // Get client details
+            $clients = $models->execute_kw(
+                $this->database,
+                $this->userId,
+                $this->password,
+                'res.partner',
+                'read',
+                [$clientIds],
+                ['fields' => ['id', 'name', 'vat', 'email', 'phone']]
+            );
+            
+            return $clients;
+            
+        } catch (Exception $e) {
+            throw new Exception('Error searching clients: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Get quotes by sales agent
      *
      * @param   string   $agentName  The sales agent name
@@ -1205,6 +1256,46 @@ class OdooHelper
 
         $result = $this->executeOdooCall($xmlPayload);
         return $this->parseCreateResponse($result);
+    }
+
+    /**
+     * Create a new product in Odoo
+     *
+     * @param   string  $name         Product name/description
+     * @param   string  $productCode  Product code (incremental)
+     * @param   float   $price        Product price
+     *
+     * @return  int  The created product ID
+     */
+    public function createProduct($name, $productCode, $price = 0.0)
+    {
+        try {
+            $models = $this->getModelsConnection();
+            
+            $productData = [
+                'name' => $name,
+                'default_code' => $productCode,
+                'list_price' => $price,
+                'type' => 'service', // or 'product' if you prefer
+                'sale_ok' => true,
+                'purchase_ok' => false,
+                'categ_id' => 1, // Default category
+            ];
+            
+            $productId = $models->execute_kw(
+                $this->database,
+                $this->userId,
+                $this->password,
+                'product.product',
+                'create',
+                [$productData]
+            );
+            
+            return $productId;
+            
+        } catch (Exception $e) {
+            throw new Exception('Error creating product: ' . $e->getMessage());
+        }
     }
     
     /**
