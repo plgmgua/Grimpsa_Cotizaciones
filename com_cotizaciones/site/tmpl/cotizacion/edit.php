@@ -13,32 +13,9 @@ use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Router\Route;
 use Joomla\CMS\Factory;
-use Joomla\CMS\Session\Session;
 
 HTMLHelper::_('bootstrap.framework');
 HTMLHelper::_('behavior.formvalidator');
-
-// Get the application input object
-$app = Factory::getApplication();
-$input = $app->input;
-
-// Safe function to escape strings
-function safeEscape($value, $default = '') {
-    if (is_string($value) && !empty($value)) {
-        return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-    }
-    return $default;
-}
-
-// Safe function to get object property
-function safeGetProperty($object, $property, $default = '') {
-    if (is_object($object) && property_exists($object, $property)) {
-        return safeEscape($object->$property, $default);
-    } elseif (is_array($object) && isset($object[$property])) {
-        return safeEscape($object[$property], $default);
-    }
-    return $default;
-}
 
 $isNew = (!isset($this->item->id) || (int)$this->item->id === 0);
 $user = Factory::getUser();
@@ -52,7 +29,7 @@ $user = Factory::getUser();
                     <?php if ($isNew): ?>
                         Nueva Cotización
                     <?php else: ?>
-                        <?php echo safeGetProperty($this->item, 'name', 'Cotización'); ?>
+                        <?php echo htmlspecialchars($this->item->name ?? 'Cotización'); ?>
                     <?php endif; ?>
                 </h1>
                 <nav aria-label="breadcrumb">
@@ -63,7 +40,7 @@ $user = Factory::getUser();
                             </a>
                         </li>
                         <li class="breadcrumb-item active" aria-current="page">
-                            <?php echo $isNew ? 'Nueva Cotización' : safeGetProperty($this->item, 'name', 'Cotización'); ?>
+                            <?php echo $isNew ? 'Nueva Cotización' : htmlspecialchars($this->item->name ?? 'Cotización'); ?>
                         </li>
                     </ol>
                 </nav>
@@ -90,7 +67,7 @@ $user = Factory::getUser();
                                             Número de Cotización
                                         </label>
                                         <input type="text" name="jform[name]" id="jform_name" 
-                                               value="<?php echo safeGetProperty($this->item, 'name'); ?>" 
+                                               value="<?php echo htmlspecialchars($this->item->name ?? ''); ?>" 
                                                class="form-control" readonly />
                                         <small class="form-text text-muted">Se genera automáticamente</small>
                                     </div>
@@ -101,7 +78,7 @@ $user = Factory::getUser();
                                             Fecha de Cotización *
                                         </label>
                                         <input type="date" name="jform[date_order]" id="jform_date_order" 
-                                               value="<?php echo date('Y-m-d', strtotime(safeGetProperty($this->item, 'date_order', date('Y-m-d')))); ?>" 
+                                               value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
                                                class="form-control required" required />
                                     </div>
                                 </div>
@@ -114,7 +91,7 @@ $user = Factory::getUser();
                                             Cliente *
                                         </label>
                                         <input type="text" name="jform[partner_id]" id="jform_partner_id" 
-                                               value="<?php echo safeGetProperty($this->item, 'partner_id'); ?>" 
+                                               value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" 
                                                class="form-control required" required 
                                                placeholder="ID del cliente" />
                                         <small class="form-text text-muted">Ingrese el ID del cliente</small>
@@ -129,7 +106,7 @@ $user = Factory::getUser();
                                             Notas
                                         </label>
                                         <textarea name="jform[note]" id="jform_note" 
-                                                 class="form-control" rows="4"><?php echo safeGetProperty($this->item, 'note'); ?></textarea>
+                                                 class="form-control" rows="4"><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -151,7 +128,7 @@ $user = Factory::getUser();
                                 <div class="input-group">
                                     <span class="input-group-text">Q</span>
                                     <input type="text" name="jform[amount_total]" id="jform_amount_total" 
-                                           value="<?php echo safeGetProperty($this->item, 'amount_total', '0.00'); ?>" 
+                                           value="<?php echo htmlspecialchars($this->item->amount_total ?? '0.00'); ?>" 
                                            class="form-control" readonly />
                                 </div>
                                 <small class="form-text text-muted">Se calcula automáticamente</small>
@@ -162,7 +139,7 @@ $user = Factory::getUser();
                                 <ul class="mb-0">
                                     <li>El número se genera automáticamente</li>
                                     <li>El total se calcula en Odoo</li>
-                                    <li>Agente: <?php echo safeEscape($user->name); ?></li>
+                                    <li>Agente: <?php echo htmlspecialchars($user->name); ?></li>
                                 </ul>
                             </div>
                         </div>
@@ -177,11 +154,6 @@ $user = Factory::getUser();
                         <button type="button" class="btn btn-success" onclick="saveQuote()">
                             <i class="fas fa-save"></i> Guardar
                         </button>
-                        <?php if (!$isNew): ?>
-                        <button type="button" class="btn btn-primary" onclick="applyQuote()">
-                            <i class="fas fa-check"></i> Aplicar
-                        </button>
-                        <?php endif; ?>
                     </div>
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-secondary" onclick="cancelQuote()">
@@ -204,13 +176,6 @@ $user = Factory::getUser();
 function saveQuote() {
     if (validateForm()) {
         document.querySelector('input[name="task"]').value = 'cotizacion.save';
-        document.getElementById('adminForm').submit();
-    }
-}
-
-function applyQuote() {
-    if (validateForm()) {
-        document.querySelector('input[name="task"]').value = 'cotizacion.apply';
         document.getElementById('adminForm').submit();
     }
 }

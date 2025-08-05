@@ -11,7 +11,6 @@ namespace Grimpsa\Component\Cotizaciones\Site\Controller;
 
 defined('_JEXEC') or die;
 
-use Joomla\CMS\Application\CMSApplication;
 use Joomla\CMS\Factory;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\MVC\Controller\FormController;
@@ -110,8 +109,7 @@ class CotizacionController extends FormController
 
             if ($result !== false) {
                 $this->app->enqueueMessage($message, 'success');
-                // Redirect to edit the created/updated quote
-                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
             } else {
                 $this->app->enqueueMessage('Error al guardar la cotización', 'error');
                 $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
@@ -121,109 +119,6 @@ class CotizacionController extends FormController
             $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
         }
 
-        return true;
-    }
-
-    /**
-     * Method to apply changes to a quote and stay on the edit form.
-     *
-     * @return  boolean  True if successful, false otherwise.
-     */
-    public function apply()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            $this->app->enqueueMessage(Text::_('JINVALID_TOKEN'), 'error');
-            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
-            return false;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            $this->app->enqueueMessage('Debes iniciar sesión para gestionar cotizaciones', 'error');
-            $this->setRedirect(Route::_('index.php?option=com_users&view=login'));
-            return false;
-        }
-
-        $model = $this->getModel('Cotizacion');
-        $data = $this->input->post->get('jform', [], 'array');
-        
-        // Ensure the sales agent field is always set
-        $data['x_studio_agente_de_ventas_1'] = $user->name;
-
-        $quoteId = $this->input->getInt('id', 0);
-        
-        try {
-            if ($quoteId > 0) {
-                $result = $model->updateQuote($quoteId, $data);
-                $message = 'Cotización actualizada exitosamente';
-            } else {
-                $result = $model->createQuote($data);
-                $message = 'Cotización creada exitosamente';
-                $quoteId = $result;
-            }
-
-            if ($result !== false) {
-                $this->app->enqueueMessage($message, 'success');
-                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
-            } else {
-                $this->app->enqueueMessage('Error al guardar la cotización', 'error');
-                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
-            }
-        } catch (Exception $e) {
-            $this->app->enqueueMessage($e->getMessage(), 'error');
-            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
-        }
-
-        return true;
-    }
-
-    /**
-     * Method to delete a quote.
-     *
-     * @return  boolean  True if successful, false otherwise.
-     */
-    public function delete()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            $this->app->enqueueMessage(Text::_('JINVALID_TOKEN'), 'error');
-            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
-            return false;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_LOGIN_REQUIRED'), 'error');
-            $this->setRedirect(Route::_('index.php?option=com_users&view=login'));
-            return false;
-        }
-
-        $quoteId = $this->input->getInt('id', 0);
-        
-        if ($quoteId <= 0) {
-            $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_INVALID_QUOTE'), 'error');
-            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
-            return false;
-        }
-
-        $model = $this->getModel('Cotizacion');
-        
-        try {
-            $result = $model->deleteQuote($quoteId);
-            
-            if ($result) {
-                $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_QUOTE_DELETED_SUCCESS'), 'success');
-            } else {
-                $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_DELETE_FAILED'), 'error');
-            }
-        } catch (Exception $e) {
-            $this->app->enqueueMessage('Error: ' . $e->getMessage(), 'error');
-        }
-
-        $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
         return true;
     }
 

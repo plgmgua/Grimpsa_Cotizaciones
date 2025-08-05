@@ -52,6 +52,7 @@ class CotizacionesModel extends ListModel
 
         try {
             $helper = new OdooHelper();
+            
             // Get pagination and search parameters
             $limitstart = $this->getStart();
             $limit = $this->getState('list.limit', 20);
@@ -66,62 +67,17 @@ class CotizacionesModel extends ListModel
                 return [];
             }
             
-            // Sort quotes by date_order (newest first) - this is the default order
+            // Sort quotes by date_order (newest first)
             usort($quotes, function($a, $b) {
                 $dateA = isset($a['date_order']) ? strtotime($a['date_order']) : 0;
                 $dateB = isset($b['date_order']) ? strtotime($b['date_order']) : 0;
                 return $dateB - $dateA; // Descending order (newest first)
             });
             
-            // Validate and normalize each quote
-            $validQuotes = [];
-            foreach ($quotes as $quote) {
-                if (is_array($quote)) {
-                    // Ensure all expected fields exist as strings
-                    $normalizedQuote = [
-                        'id' => isset($quote['id']) ? (string)$quote['id'] : '0',
-                        'name' => isset($quote['name']) && is_string($quote['name']) ? $quote['name'] : '',
-                        'partner_id' => isset($quote['partner_id']) ? $quote['partner_id'] : '0',
-                        'contact_name' => isset($quote['contact_name']) && is_string($quote['contact_name']) ? $quote['contact_name'] : '',
-                        'date_order' => isset($quote['date_order']) && is_string($quote['date_order']) ? $quote['date_order'] : '',
-                        'amount_total' => isset($quote['amount_total']) ? (string)$quote['amount_total'] : '0.00',
-                        'state' => isset($quote['state']) && is_string($quote['state']) ? $quote['state'] : 'draft',
-                        'note' => isset($quote['note']) && is_string($quote['note']) ? $quote['note'] : ''
-                    ];
-                    
-                    $validQuotes[] = $normalizedQuote;
-                }
-            }
-            
-            return $validQuotes;
-            
-        } catch (Exception $e) {
-            Factory::getApplication()->enqueueMessage('Error connecting to Odoo: ' . $e->getMessage(), 'error');
-            return [];
-        }
-    }
-
-    /**
-     * Method to get quotes by contact ID.
-     *
-     * @param   integer  $contactId  The contact ID
-     *
-     * @return  array  An array of quotes for this contact.
-     */
-    public function getQuotesByContact($contactId)
-    {
-        try {
-            $helper = new OdooHelper();
-            $quotes = $helper->getQuotesByContact($contactId);
-            
-            if (!is_array($quotes)) {
-                return [];
-            }
-            
             return $quotes;
             
         } catch (Exception $e) {
-            Factory::getApplication()->enqueueMessage('Error loading quotes: ' . $e->getMessage(), 'error');
+            Factory::getApplication()->enqueueMessage('Error connecting to Odoo: ' . $e->getMessage(), 'error');
             return [];
         }
     }
@@ -141,7 +97,7 @@ class CotizacionesModel extends ListModel
 
         try {
             $helper = new OdooHelper();
-            $quotes = $helper->getQuotesByAgent($user->name, 1, 1000); // Get a large number to count
+            $quotes = $helper->getQuotesByAgent($user->name, 1, 1000);
             return is_array($quotes) ? count($quotes) : 0;
         } catch (Exception $e) {
             return 0;

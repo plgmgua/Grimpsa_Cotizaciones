@@ -64,7 +64,6 @@ class CotizacionModel extends AdminModel
     public function getItem($pk = null)
     {
         $app = Factory::getApplication();
-        $input = $app->input;
         
         // Get the ID from input or state, default to 0 for new quotes
         if ($pk === null) {
@@ -84,26 +83,8 @@ class CotizacionModel extends AdminModel
             'note' => ''
         ];
         
-        // For new quotes, check if we have pre-filled data from URL parameters
+        // For new quotes, return default item
         if ($pk <= 0) {
-            $contactId = $input->getInt('contact_id', 0);
-            if ($contactId > 0) {
-                $defaultItem->partner_id = $contactId;
-                
-                // Try to get contact name for better UX
-                try {
-                    if (class_exists('\Grimpsa\Component\OdooContacts\Site\Helper\OdooHelper')) {
-                        $contactsHelper = new \Grimpsa\Component\OdooContacts\Site\Helper\OdooHelper();
-                        $contact = $contactsHelper->getContact($contactId);
-                        if ($contact && isset($contact['name'])) {
-                            $defaultItem->contact_name = $contact['name'];
-                        }
-                    }
-                } catch (Exception $e) {
-                    // Silently handle error
-                }
-            }
-            
             return $defaultItem;
         }
 
@@ -115,15 +96,6 @@ class CotizacionModel extends AdminModel
                 return $defaultItem;
             }
 
-            // Get contact information if partner_id exists
-            if (!empty($quote['partner_id']) && (int)$quote['partner_id'] > 0) {
-                $contact = $helper->getContactInfo((int)$quote['partner_id']);
-                if ($contact) {
-                    $quote['contact_name'] = $contact['name'] ?? '';
-                    $quote['contact_vat'] = $contact['vat'] ?? '';
-                    $quote['contact_email'] = $contact['email'] ?? '';
-                }
-            }
             // Ensure all properties exist
             foreach ($defaultItem as $key => $value) {
                 if (!isset($quote[$key])) {
