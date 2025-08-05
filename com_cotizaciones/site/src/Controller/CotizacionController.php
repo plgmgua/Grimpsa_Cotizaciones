@@ -95,86 +95,17 @@ class CotizacionController extends FormController
         
         // Ensure the sales agent field is always set
         $data['x_studio_agente_de_ventas_1'] = $user->name;
-        
-        // Handle quote lines for new quotes
-        $quoteLinesJson = $this->input->post->getString('quote_lines_data', '');
-        $quoteLines = [];
-        if (!empty($quoteLinesJson)) {
-            $quoteLines = json_decode($quoteLinesJson, true);
-            if (!is_array($quoteLines)) {
-                $quoteLines = [];
-            }
-        }
-        
-        // Debug logging if enabled
-        if ($this->app->get('debug', 0)) {
-            $this->app->enqueueMessage('Setting sales agent: ' . $user->name, 'info');
-            if (!empty($quoteLines)) {
-                $this->app->enqueueMessage('Quote lines count: ' . count($quoteLines), 'info');
-            }
-        }
 
         $quoteId = $this->input->getInt('id', 0);
         
         try {
             if ($quoteId > 0) {
                 $result = $model->updateQuote($quoteId, $data);
-                
-                // Handle quote lines for existing quotes
-                if (!empty($quoteLines)) {
-                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                    foreach ($quoteLines as $line) {
-                        if (isset($line['is_new']) && $line['is_new']) {
-                            // Create product first
-                            $productId = $helper->createProduct(
-                                $line['description'],
-                                'PROD-' . $line['product_code'],
-                                (float)$line['price']
-                            );
-                            
-                            // Create quote line
-                            $helper->createQuoteLine(
-                                $quoteId,
-                                $productId,
-                                $line['description'],
-                                (float)$line['quantity'],
-                                (float)$line['price']
-                            );
-                        }
-                    }
-                }
-                
                 $message = 'Cotización actualizada exitosamente';
             } else {
                 $result = $model->createQuote($data);
-                
-                if ($result !== false) {
-                    $quoteId = $result;
-                    
-                    // Handle quote lines for new quotes
-                    if (!empty($quoteLines)) {
-                        $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                        foreach ($quoteLines as $line) {
-                            // Create product first
-                            $productId = $helper->createProduct(
-                                $line['description'],
-                                'PROD-' . $line['product_code'],
-                                (float)$line['price']
-                            );
-                            
-                            // Create quote line
-                            $helper->createQuoteLine(
-                                $quoteId,
-                                $productId,
-                                $line['description'],
-                                (float)$line['quantity'],
-                                (float)$line['price']
-                            );
-                        }
-                    }
-                }
-                
                 $message = 'Cotización creada exitosamente';
+                $quoteId = $result;
             }
 
             if ($result !== false) {
@@ -220,11 +151,6 @@ class CotizacionController extends FormController
         
         // Ensure the sales agent field is always set
         $data['x_studio_agente_de_ventas_1'] = $user->name;
-        
-        // Debug logging if enabled
-        if ($this->app->get('debug', 0)) {
-            $this->app->enqueueMessage('Setting sales agent: ' . $user->name, 'info');
-        }
 
         $quoteId = $this->input->getInt('id', 0);
         
@@ -312,190 +238,5 @@ class CotizacionController extends FormController
     {
         $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
         return true;
-    }
-
-    /**
-     * Search clients via AJAX
-     *
-     * @return  void
-     */
-    public function searchClients()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            echo json_encode(['success' => false, 'message' => 'Invalid token']);
-            $this->app->close();
-            return;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            echo json_encode(['success' => false, 'message' => 'Login required']);
-            $this->app->close();
-            return;
-        }
-
-        $search = $this->input->getString('search', '');
-        
-        if (strlen($search) < 2) {
-            echo json_encode(['success' => false, 'message' => 'Search term too short']);
-            $this->app->close();
-            return;
-        }
-
-        try {
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            $clients = $helper->searchClients($search);
-            
-            echo json_encode([
-                'success' => true,
-                'clients' => $clients
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-
-        $this->app->close();
-    }
-
-    /**
-     * Get quote lines via AJAX
-     *
-     * @return  void
-     */
-    public function getLines()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            echo json_encode(['success' => false, 'message' => 'Invalid token']);
-            return;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            echo json_encode(['success' => false, 'message' => 'Login required']);
-            return;
-        }
-
-        $quoteId = $this->input->getInt('quote_id', 0);
-        
-        if ($quoteId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Invalid quote ID']);
-            return;
-        }
-
-        try {
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            $lines = $helper->getQuoteLines($quoteId);
-            
-            echo json_encode([
-                'success' => true,
-                'lines' => $lines
-            ]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-
-        $this->app->close();
-    }
-
-    /**
-     * Add quote line via AJAX
-     *
-     * @return  void
-     */
-    public function addLine()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            echo json_encode(['success' => false, 'message' => 'Invalid token']);
-            return;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            echo json_encode(['success' => false, 'message' => 'Login required']);
-            return;
-        }
-
-        $quoteId = $this->input->getInt('quote_id', 0);
-        $description = $this->input->getString('description', '');
-        $quantity = $this->input->getFloat('quantity', 1.0);
-        $price = $this->input->getFloat('price', 0.0);
-        
-        if ($quoteId <= 0 || empty($description)) {
-            echo json_encode(['success' => false, 'message' => 'Missing required data']);
-            return;
-        }
-
-        try {
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            
-            // Create product first
-            $productId = $helper->createProduct($description);
-            
-            if ($productId) {
-                // Create quote line
-                $lineId = $helper->createQuoteLine($quoteId, $productId, $description, $quantity, $price);
-                
-                if ($lineId) {
-                    echo json_encode(['success' => true, 'line_id' => $lineId]);
-                } else {
-                    echo json_encode(['success' => false, 'message' => 'Failed to create quote line']);
-                }
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to create product']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-
-        $this->app->close();
-    }
-
-    /**
-     * Delete quote line via AJAX
-     *
-     * @return  void
-     */
-    public function deleteLine()
-    {
-        // Check for request forgeries
-        if (!Session::checkToken()) {
-            echo json_encode(['success' => false, 'message' => 'Invalid token']);
-            return;
-        }
-
-        $user = Factory::getUser();
-        
-        if ($user->guest) {
-            echo json_encode(['success' => false, 'message' => 'Login required']);
-            return;
-        }
-
-        $lineId = $this->input->getInt('line_id', 0);
-        
-        if ($lineId <= 0) {
-            echo json_encode(['success' => false, 'message' => 'Invalid line ID']);
-            return;
-        }
-
-        try {
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            $result = $helper->deleteQuoteLine($lineId);
-            
-            if ($result) {
-                echo json_encode(['success' => true]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to delete line']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-
-        $this->app->close();
     }
 }

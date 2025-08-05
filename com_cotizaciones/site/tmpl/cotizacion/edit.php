@@ -110,38 +110,14 @@ $user = Factory::getUser();
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="mb-3">
-                                        <label for="client_search" class="form-label">
+                                        <label for="jform_partner_id" class="form-label">
                                             Cliente *
                                         </label>
-                                        <?php if ($isNew): ?>
-                                            <!-- Client Search for New Quotes -->
-                                            <div class="client-selector">
-                                                <input type="hidden" name="jform[partner_id]" id="jform_partner_id" 
-                                                       value="<?php echo safeGetProperty($this->item, 'partner_id'); ?>" 
-                                                       class="required" required />
-                                                <input type="text" id="client_search" 
-                                                       class="form-control" 
-                                                       placeholder="Escriba el nombre del cliente para buscar..." 
-                                                       autocomplete="off" />
-                                                <div id="client_results" class="client-results" style="display: none;"></div>
-                                                <div id="selected_client" class="selected-client mt-2"></div>
-                                            </div>
-                                            <small class="form-text text-muted">Busque y seleccione un cliente</small>
-                                        <?php else: ?>
-                                            <!-- Display Selected Client for Existing Quotes -->
-                                            <input type="hidden" name="jform[partner_id]" id="jform_partner_id" 
-                                                   value="<?php echo safeGetProperty($this->item, 'partner_id'); ?>" />
-                                            <div class="alert alert-info">
-                                                <i class="fas fa-user"></i>
-                                                <strong><?php echo safeGetProperty($this->item, 'contact_name', 'Cliente ID: ' . safeGetProperty($this->item, 'partner_id')); ?></strong>
-                                                <?php if (!empty(safeGetProperty($this->item, 'contact_vat'))): ?>
-                                                    <br><small>NIT: <?php echo safeGetProperty($this->item, 'contact_vat'); ?></small>
-                                                <?php endif; ?>
-                                                <?php if (!empty(safeGetProperty($this->item, 'contact_email'))): ?>
-                                                    <br><small>Email: <?php echo safeGetProperty($this->item, 'contact_email'); ?></small>
-                                                <?php endif; ?>
-                                            </div>
-                                        <?php endif; ?>
+                                        <input type="text" name="jform[partner_id]" id="jform_partner_id" 
+                                               value="<?php echo safeGetProperty($this->item, 'partner_id'); ?>" 
+                                               class="form-control required" required 
+                                               placeholder="ID del cliente" />
+                                        <small class="form-text text-muted">Ingrese el ID del cliente</small>
                                     </div>
                                 </div>
                             </div>
@@ -159,82 +135,6 @@ $user = Factory::getUser();
                             </div>
                         </div>
                     </div>
-
-                    <!-- Quote Lines Section - Only show for existing quotes -->
-                    <?php if (!$isNew): ?>
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-list"></i> Líneas de la Cotización
-                                </h5>
-                                <button type="button" class="btn btn-success btn-sm" onclick="showAddLineForm()">
-                                    <i class="fas fa-plus"></i> Agregar Línea
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <!-- Add Line Form -->
-                            <div id="add_line_form" class="add-line-form mb-4" style="display: none;">
-                                <div class="card border-success">
-                                    <div class="card-header bg-success text-white">
-                                        <h6 class="mb-0">Agregar Nueva Línea</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="line_description" class="form-label">Descripción *</label>
-                                                    <textarea id="line_description" class="form-control" rows="3" 
-                                                             maxlength="600"
-                                                             placeholder="Descripción del producto/servicio (máximo 600 caracteres)"></textarea>
-                                                    <small class="form-text text-muted">
-                                                        <span id="char_count">0</span>/600 caracteres
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <div class="mb-3">
-                                                    <label for="line_quantity" class="form-label">Cantidad *</label>
-                                                    <input type="number" id="line_quantity" class="form-control" 
-                                                           value="1.00" step="0.01" min="0.01" />
-                                                </div>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <div class="mb-3">
-                                                    <label for="line_price" class="form-label">Precio *</label>
-                                                    <input type="number" id="line_price" class="form-control" 
-                                                           value="0.00" step="0.01" min="0" />
-                                                </div>
-                                            </div>
-                                            <div class="col-md-2">
-                                                <div class="mb-3">
-                                                    <label class="form-label">&nbsp;</label>
-                                                    <div class="btn-group d-block">
-                                                        <button type="button" class="btn btn-success btn-sm d-block mb-1" onclick="addQuoteLine()">
-                                                            <i class="fas fa-plus"></i> Agregar
-                                                        </button>
-                                                        <button type="button" class="btn btn-secondary btn-sm d-block" onclick="hideAddLineForm()">
-                                                            <i class="fas fa-times"></i> Cancelar
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Quote Lines Display -->
-                            <div id="quote_lines_container">
-                                <div class="alert alert-info">
-                                    <i class="fas fa-info-circle"></i> 
-                                    Cargando líneas de cotización...
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <?php endif; ?>
                 </div>
 
                 <!-- Summary Information -->
@@ -263,9 +163,6 @@ $user = Factory::getUser();
                                     <li>El número se genera automáticamente</li>
                                     <li>El total se calcula en Odoo</li>
                                     <li>Agente: <?php echo safeEscape($user->name); ?></li>
-                                    <?php if ($isNew): ?>
-                                    <li><strong>Guarde primero para agregar líneas</strong></li>
-                                    <?php endif; ?>
                                 </ul>
                             </div>
                         </div>
@@ -303,250 +200,6 @@ $user = Factory::getUser();
 </div>
 
 <script>
-// Global variables
-let clientSearchTimeout;
-let isNew = <?php echo $isNew ? 'true' : 'false'; ?>;
-
-// Client search functionality
-function searchClients() {
-    const searchTerm = document.getElementById('client_search').value;
-    if (searchTerm.length < 2) {
-        document.getElementById('client_results').style.display = 'none';
-        return;
-    }
-    
-    const resultsDiv = document.getElementById('client_results');
-    resultsDiv.innerHTML = '<div class="p-2"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
-    resultsDiv.style.display = 'block';
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.searchClients'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'search=' + encodeURIComponent(searchTerm) + '&<?php echo Session::getFormToken(); ?>=1'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.clients && data.clients.length > 0) {
-            displayClientResults(data.clients);
-        } else {
-            resultsDiv.innerHTML = '<div class="p-2 text-muted">No se encontraron clientes</div>';
-        }
-    })
-    .catch(error => {
-        resultsDiv.innerHTML = '<div class="p-2 text-danger">Error en la búsqueda</div>';
-    });
-}
-
-function displayClientResults(clients) {
-    const resultsDiv = document.getElementById('client_results');
-    let html = '';
-    
-    clients.forEach(client => {
-        const clientName = client.name || 'Sin nombre';
-        const clientVat = client.vat || '';
-        const clientEmail = client.email || '';
-        
-        html += `<div class="client-result-item" onclick="selectClient(${client.id}, '${clientName.replace(/'/g, "\\'")}', '${clientVat}', '${clientEmail}')">
-            <strong>${clientName}</strong>
-            ${clientVat ? `<br><small class="text-muted">NIT: ${clientVat}</small>` : ''}
-            ${clientEmail ? `<br><small class="text-muted">${clientEmail}</small>` : ''}
-        </div>`;
-    });
-    
-    resultsDiv.innerHTML = html;
-}
-
-function selectClient(id, name, vat, email) {
-    document.getElementById('jform_partner_id').value = id;
-    document.getElementById('client_search').value = '';
-    document.getElementById('client_results').style.display = 'none';
-    
-    const selectedDiv = document.getElementById('selected_client');
-    selectedDiv.innerHTML = `<div class="alert alert-success">
-        <i class="fas fa-check-circle"></i> 
-        <strong>${name}</strong>
-        ${vat ? `<br><small>NIT: ${vat}</small>` : ''}
-        ${email ? `<br><small>Email: ${email}</small>` : ''}
-        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearSelectedClient()">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>`;
-}
-
-function clearSelectedClient() {
-    document.getElementById('jform_partner_id').value = '';
-    document.getElementById('selected_client').innerHTML = '';
-}
-
-// Quote lines functionality (only for existing quotes)
-function showAddLineForm() {
-    if (isNew) {
-        alert('Debe guardar la cotización primero antes de agregar líneas');
-        return;
-    }
-    document.getElementById('add_line_form').style.display = 'block';
-    document.getElementById('line_description').focus();
-}
-
-function hideAddLineForm() {
-    document.getElementById('add_line_form').style.display = 'none';
-    clearLineForm();
-}
-
-function clearLineForm() {
-    document.getElementById('line_description').value = '';
-    document.getElementById('line_quantity').value = '1.00';
-    document.getElementById('line_price').value = '0.00';
-    updateCharCount();
-}
-
-function addQuoteLine() {
-    const description = document.getElementById('line_description').value.trim();
-    const quantity = parseFloat(document.getElementById('line_quantity').value) || 1;
-    const price = parseFloat(document.getElementById('line_price').value) || 0;
-    
-    if (!description) {
-        alert('La descripción es requerida');
-        return;
-    }
-    
-    if (description.length > 600) {
-        alert('La descripción no puede exceder 600 caracteres');
-        return;
-    }
-    
-    // Add line via AJAX
-    const quoteId = <?php echo (int)($this->item->id ?? 0); ?>;
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.addLine'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `quote_id=${quoteId}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            hideAddLineForm();
-            loadQuoteLines(); // Reload lines
-            alert('Línea agregada exitosamente');
-        } else {
-            alert('Error al agregar línea: ' + (data.message || 'Error desconocido'));
-        }
-    })
-    .catch(error => {
-        alert('Error de conexión');
-    });
-}
-
-function updateCharCount() {
-    const description = document.getElementById('line_description');
-    if (description) {
-        const count = description.value.length;
-        const charCountElement = document.getElementById('char_count');
-        if (charCountElement) {
-            charCountElement.textContent = count;
-            
-            if (count > 600) {
-                charCountElement.style.color = 'red';
-            } else if (count > 500) {
-                charCountElement.style.color = 'orange';
-            } else {
-                charCountElement.style.color = 'inherit';
-            }
-        }
-    }
-}
-
-// Load existing quote lines
-function loadQuoteLines() {
-    if (isNew) return;
-    
-    const quoteId = <?php echo (int)($this->item->id ?? 0); ?>;
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.getLines'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'quote_id=' + quoteId + '&<?php echo Session::getFormToken(); ?>=1'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success && data.lines) {
-            displayQuoteLines(data.lines);
-        } else {
-            document.getElementById('quote_lines_container').innerHTML = 
-                '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No hay líneas en esta cotización</div>';
-        }
-    })
-    .catch(error => {
-        console.error('Error loading quote lines:', error);
-    });
-}
-
-function displayQuoteLines(lines) {
-    const container = document.getElementById('quote_lines_container');
-    
-    if (!lines || lines.length === 0) {
-        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No hay líneas en esta cotización</div>';
-        return;
-    }
-    
-    let html = '<div class="table-responsive"><table class="table table-striped quote-lines-table">';
-    html += '<thead class="table-success"><tr>';
-    html += '<th>Descripción</th><th>Cantidad</th><th>Precio Unit.</th><th>Subtotal</th><th>Acciones</th>';
-    html += '</tr></thead><tbody>';
-    
-    lines.forEach(line => {
-        const quantity = parseFloat(line.product_uom_qty || line.quantity || 0);
-        const price = parseFloat(line.price_unit || line.price || 0);
-        const subtotal = quantity * price;
-        
-        html += `<tr>
-            <td>${line.name || line.description || ''}</td>
-            <td>${quantity.toFixed(2)}</td>
-            <td class="currency-amount">Q ${price.toFixed(2)}</td>
-            <td><strong class="currency-amount">Q ${subtotal.toFixed(2)}</strong></td>
-            <td>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteLine(${line.id})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        </tr>`;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-function deleteLine(lineId) {
-    if (!confirm('¿Eliminar esta línea de la cotización?')) return;
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.deleteLine'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `line_id=${lineId}&<?php echo Session::getFormToken(); ?>=1`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            loadQuoteLines(); // Reload lines
-            alert('Línea eliminada exitosamente');
-        } else {
-            alert('Error al eliminar línea: ' + (data.message || 'Error desconocido'));
-        }
-    })
-    .catch(error => {
-        alert('Error de conexión');
-    });
-}
-
 // Form submission functions
 function saveQuote() {
     if (validateForm()) {
@@ -573,7 +226,7 @@ function validateForm() {
     const dateOrder = document.getElementById('jform_date_order').value;
     
     if (!partnerId) {
-        alert('Debe seleccionar un cliente');
+        alert('Debe ingresar un ID de cliente');
         return false;
     }
     
@@ -584,37 +237,4 @@ function validateForm() {
     
     return true;
 }
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Client search
-    const clientSearchInput = document.getElementById('client_search');
-    if (clientSearchInput) {
-        clientSearchInput.addEventListener('input', function() {
-            clearTimeout(clientSearchTimeout);
-            clientSearchTimeout = setTimeout(searchClients, 300);
-        });
-    }
-    
-    // Character count for description
-    const descriptionInput = document.getElementById('line_description');
-    if (descriptionInput) {
-        descriptionInput.addEventListener('input', updateCharCount);
-    }
-    
-    // Hide client results when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.client-selector')) {
-            const resultsDiv = document.getElementById('client_results');
-            if (resultsDiv) {
-                resultsDiv.style.display = 'none';
-            }
-        }
-    });
-    
-    // Load existing quote lines if editing
-    if (!isNew) {
-        loadQuoteLines();
-    }
-});
 </script>
