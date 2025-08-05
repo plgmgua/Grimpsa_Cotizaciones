@@ -8,7 +8,7 @@
     <authorEmail>admin@grimpsa.com</authorEmail>
     <authorUrl>https://grimpsa.com</authorUrl>
     <version>1.0.0</version>
-    <description>COM_COTIZACIONES_XML_DESCRIPTION</description>
+    <description><![CDATA[COM_COTIZACIONES_XML_DESCRIPTION]]></description>
 
     <namespace path="src">Grimpsa\Component\Cotizaciones</namespace>
 
