@@ -187,7 +187,8 @@ class CotizacionesModel extends ListModel
         $this->setState('list.start', $limitstart);
 
         // Get the search filter
-        $search = $app->getUserStateFromRequest($this->context . '.filter.search', 'filter_search', '', 'string');
+        $search = $app->input->get('filter_search', '', 'string');
+        $search = trim($search);
         $this->setState('filter.search', $search);
 
         // Set the ordering

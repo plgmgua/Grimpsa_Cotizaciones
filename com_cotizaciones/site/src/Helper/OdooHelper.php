@@ -211,83 +211,7 @@ class OdooHelper
         }
         
         // Fallback to the old method using Odoo user mapping
-        // Get quotes from sale.order model filtered by sales agent
-        $xmlPayload = '<?xml version="1.0"?>
-<methodCall>
-   <methodName>execute_kw</methodName>
-   <params>
-      <param>
-         <value><string>grupoimpre</string></value>
-      </param>
-      <param>
-         <value><int>2</int></value>
-      </param>
-      <param>
-         <value><string>2386bb5ae66c7fd9022feaf82148680c4cf4ce3b</string></value>
-      </param>
-      <param>
-         <value><string>sale.order</string></value>
-      </param>
-      <param>
-         <value><string>search_read</string></value>
-      </param>
-      <param>
-         <value>
-            <array>
-               <data>
-                  <value>
-                     <array>
-                        <data>
-                           <value>
-                              <array>
-                                 <data>
-                                    <value><string>x_studio_agente_de_ventas_1</string></value>
-                                    <value><string>=</string></value>
-                                    <value><string>' . htmlspecialchars($agentName, ENT_XML1, 'UTF-8') . '</string></value>
-                                 </data>
-                              </array>
-                           </value>
-                        </data>
-                     </array>
-                  </value>
-               </data>
-            </array>
-         </value>
-      </param>
-      <param>
-         <value>
-            <struct>
-               <member>
-                  <name>fields</name>
-                  <value>
-                     <array>
-                        <data>
-                           <value><string>name</string></value>
-                           <value><string>partner_id</string></value>
-                           <value><string>date_order</string></value>
-                           <value><string>amount_total</string></value>
-                           <value><string>state</string></value>
-                           <value><string>user_id</string></value>
-                           <value><string>x_studio_agente_de_ventas_1</string></value>
-                           <value><string>note</string></value>
-                           <value><string>order_line</string></value>
-                        </data>
-                     </array>
-                  </value>
-               </member>
-            </struct>
-         </value>
-      </param>
-   </params>
-</methodCall>';
-
-        $result = $this->executeOdooCall($xmlPayload);
-        
-        if (!$result) {
-            return [];
-        }
-
-        return $this->parseQuotesWithContactNames($result);
+        return $this->getQuotesByCustomField($agentName, 'x_studio_agente_de_ventas_1', $page, $limit, $search);
     }
 
     /**
@@ -303,6 +227,39 @@ class OdooHelper
      */
     private function getQuotesByCustomField($agentName, $salesAgentField, $page = 1, $limit = 20, $search = '')
     {
+        // Build search conditions
+        $searchConditions = '';
+        
+        // If search term is provided, search by client name
+        if (!empty($search)) {
+            // First get client IDs that match the search term
+            $clientIds = $this->searchClientIdsByName($search, $agentName);
+            
+            if (!empty($clientIds)) {
+                $clientIdsXml = '';
+                foreach ($clientIds as $clientId) {
+                    $clientIdsXml .= '<value><int>' . $clientId . '</int></value>';
+                }
+                
+                $searchConditions = '<value>
+                    <array>
+                        <data>
+                            <value><string>partner_id</string></value>
+                            <value><string>in</string></value>
+                            <value>
+                                <array>
+                                    <data>' . $clientIdsXml . '</data>
+                                </array>
+                            </value>
+                        </data>
+                    </array>
+                </value>';
+            } else {
+                // No clients found matching search, return empty results
+                return [];
+            }
+        }
+        
         $xmlPayload = '<?xml version="1.0"?>
 <methodCall>
    <methodName>execute_kw</methodName>
@@ -338,7 +295,7 @@ class OdooHelper
                                  </data>
                               </array>
                            </value>
-                        </data>
+                        </data>' . $searchConditions . '
                      </array>
                   </value>
                </data>
@@ -377,7 +334,225 @@ class OdooHelper
             return [];
         }
 
-        return $this->parseQuotesResponse($result);
+        return $this->parseQuotesWithContactNames($result);
+    }
+
+    /**
+     * Search for client IDs by name for a specific sales agent
+     *
+     * @param   string  $searchTerm  The search term
+     * @param   string  $agentName   The sales agent name
+     *
+     * @return  array  Array of client IDs
+     */
+    private function searchClientIdsByName($searchTerm, $agentName)
+    {
+        // First, get all quotes for this agent to find their clients
+        $xmlPayload = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>grupoimpre</string></value>
+      </param>
+      <param>
+         <value><int>2</int></value>
+      </param>
+      <param>
+         <value><string>2386bb5ae66c7fd9022feaf82148680c4cf4ce3b</string></value>
+      </param>
+      <param>
+         <value><string>res.partner</string></value>
+      </param>
+      <param>
+         <value><string>search_read</string></value>
+      </param>
+      <param>
+         <value>
+            <array>
+               <data>
+                  <value>
+                     <array>
+                        <data>
+                           <value>
+                              <array>
+                                 <data>
+                                    <value><string>name</string></value>
+                                    <value><string>ilike</string></value>
+                                    <value><string>' . htmlspecialchars($searchTerm, ENT_XML1, 'UTF-8') . '</string></value>
+                                 </data>
+                              </array>
+                           </value>
+                        </data>
+                     </array>
+                  </value>
+               </data>
+            </array>
+         </value>
+      </param>
+      <param>
+         <value>
+            <struct>
+               <member>
+                  <name>fields</name>
+                  <value>
+                     <array>
+                        <data>
+                           <value><string>id</string></value>
+                           <value><string>name</string></value>
+                        </data>
+                     </array>
+                  </value>
+               </member>
+               <member>
+                  <name>limit</name>
+                  <value><int>50</int></value>
+               </member>
+            </struct>
+         </value>
+      </param>
+   </params>
+</methodCall>';
+
+        $result = $this->executeOdooCall($xmlPayload);
+        
+        if (!$result) {
+            return [];
+        }
+
+        // Parse the client results and filter by those that have quotes with this agent
+        $allClients = $this->parseClientsResponse($result);
+        $validClientIds = [];
+        
+        // For each found client, check if they have quotes with this agent
+        foreach ($allClients as $client) {
+            if ($this->clientHasQuotesWithAgent($client['id'], $agentName)) {
+                $validClientIds[] = $client['id'];
+            }
+        }
+        
+        return $validClientIds;
+    }
+
+    /**
+     * Check if a client has quotes with a specific sales agent
+     *
+     * @param   integer  $clientId   The client ID
+     * @param   string   $agentName  The sales agent name
+     *
+     * @return  boolean  True if client has quotes with this agent
+     */
+    private function clientHasQuotesWithAgent($clientId, $agentName)
+    {
+        $xmlPayload = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>grupoimpre</string></value>
+      </param>
+      <param>
+         <value><int>2</int></value>
+      </param>
+      <param>
+         <value><string>2386bb5ae66c7fd9022feaf82148680c4cf4ce3b</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>search_count</string></value>
+      </param>
+      <param>
+         <value>
+            <array>
+               <data>
+                  <value>
+                     <array>
+                        <data>
+                           <value>
+                              <array>
+                                 <data>
+                                    <value><string>partner_id</string></value>
+                                    <value><string>=</string></value>
+                                    <value><int>' . $clientId . '</int></value>
+                                 </data>
+                              </array>
+                           </value>
+                           <value>
+                              <array>
+                                 <data>
+                                    <value><string>x_studio_agente_de_ventas_1</string></value>
+                                    <value><string>=</string></value>
+                                    <value><string>' . htmlspecialchars($agentName, ENT_XML1, 'UTF-8') . '</string></value>
+                                 </data>
+                              </array>
+                           </value>
+                        </data>
+                     </array>
+                  </value>
+               </data>
+            </array>
+         </value>
+      </param>
+   </params>
+</methodCall>';
+
+        $result = $this->executeOdooCall($xmlPayload);
+        
+        if (!$result || !isset($result['params']['param']['value']['int'])) {
+            return false;
+        }
+        
+        return (int)$result['params']['param']['value']['int'] > 0;
+    }
+
+    /**
+     * Parse clients response from Odoo
+     *
+     * @param   mixed  $result  The API response
+     *
+     * @return  array  Array of clients
+     */
+    private function parseClientsResponse($result)
+    {
+        if (!$result || !isset($result['params']['param']['value']['array']['data']['value'])) {
+            return [];
+        }
+
+        $clients = [];
+        $values = $result['params']['param']['value']['array']['data']['value'];
+
+        // Handle single client response
+        if (isset($values['struct'])) {
+            $values = [$values];
+        }
+
+        foreach ($values as $value) {
+            if (!isset($value['struct']['member'])) {
+                continue;
+            }
+
+            $client = [];
+            foreach ($value['struct']['member'] as $member) {
+                $fieldName = $member['name'];
+                $fieldValue = '';
+                
+                if (isset($member['value']['string'])) {
+                    $fieldValue = $member['value']['string'];
+                } elseif (isset($member['value']['int'])) {
+                    $fieldValue = (string)$member['value']['int'];
+                }
+                
+                $client[$fieldName] = $fieldValue;
+            }
+            
+            if (!empty($client['id']) && !empty($client['name'])) {
+                $clients[] = $client;
+            }
+        }
+
+        return $clients;
     }
 
     /**

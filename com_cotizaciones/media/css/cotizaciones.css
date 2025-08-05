@@ -55,6 +55,29 @@
     background-color: white;
 }
 
+/* Search functionality */
+.quotes-ribbon .btn-outline-warning {
+    background-color: white;
+    color: #f0ad4e;
+    border-color: #f0ad4e;
+}
+
+.quotes-ribbon .btn-outline-warning:hover {
+    background-color: #f0ad4e;
+    color: white;
+}
+
+.quotes-ribbon .alert {
+    border-radius: 6px;
+    padding: 12px 16px;
+}
+
+.quotes-ribbon .alert-info {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #0c5460;
+}
+
 .quotes-table-container {
     background: white;
     border-radius: 8px;

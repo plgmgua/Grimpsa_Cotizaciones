@@ -75,7 +75,7 @@ function getStateLabel($state) {
     <!-- Main Actions Ribbon -->
     <div class="quotes-ribbon">
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-md-5">
                 <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="adminForm" id="adminForm">
                     <div class="input-group">
                         <span class="input-group-text">
@@ -84,10 +84,16 @@ function getStateLabel($state) {
                         <input type="text" name="filter_search" id="filter_search" 
                                value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" 
                                class="form-control" 
-                               placeholder="Buscar por número, cliente..." />
+                               placeholder="Buscar por nombre de cliente..." />
                         <button class="btn btn-outline-secondary" type="submit">
                             Buscar
                         </button>
+                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                            <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
+                               class="btn btn-outline-warning" title="Limpiar búsqueda">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        <?php endif; ?>
                     </div>
                     <input type="hidden" name="task" value="" />
                     <?php echo HTMLHelper::_('form.token'); ?>
@@ -122,19 +128,51 @@ function getStateLabel($state) {
                 </div>
             </div>
         </div>
+        
+        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-search"></i> 
+                        Mostrando resultados para: <strong>"<?php echo safeEscape($this->state->get('filter.search', '')); ?>"</strong>
+                        <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
+                           class="btn btn-sm btn-outline-primary ms-2">
+                            Ver todas las cotizaciones
+                        </a>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Quotes Table -->
     <div class="quotes-table-container">
         <?php if (empty($this->items) || !is_array($this->items)): ?>
-            <div class="alert alert-info">
-                <h4><i class="fas fa-info-circle"></i> No se Encontraron Cotizaciones</h4>
-                <p>Aún no tienes cotizaciones. Crea tu primera cotización para comenzar.</p>
-                <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit'); ?>" 
-                   class="btn btn-primary">
-                    Crear Tu Primera Cotización
-                </a>
-            </div>
+            <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                <div class="alert alert-warning">
+                    <h4><i class="fas fa-search"></i> No se Encontraron Resultados</h4>
+                    <p>No se encontraron cotizaciones que coincidan con "<strong><?php echo safeEscape($this->state->get('filter.search', '')); ?></strong>".</p>
+                    <p>Intenta con:</p>
+                    <ul>
+                        <li>Verificar la ortografía del nombre del cliente</li>
+                        <li>Usar solo parte del nombre del cliente</li>
+                        <li>Buscar con términos más generales</li>
+                    </ul>
+                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
+                       class="btn btn-primary">
+                        Ver Todas las Cotizaciones
+                    </a>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-info">
+                    <h4><i class="fas fa-info-circle"></i> No se Encontraron Cotizaciones</h4>
+                    <p>Aún no tienes cotizaciones. Crea tu primera cotización para comenzar.</p>
+                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit'); ?>" 
+                       class="btn btn-primary">
+                        Crear Tu Primera Cotización
+                    </a>
+                </div>
+            <?php endif; ?>
         <?php else: ?>
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
