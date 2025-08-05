@@ -15,18 +15,19 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Component\ComponentHelper;
 
 /**
- * Helper class for Odoo integration using cURL
+ * Helper class for Odoo integration using cURL with proper endpoints
  */
 class OdooHelper
 {
     /**
      * Odoo configuration
      */
-    private $url;
+    private $baseUrl;
     private $database;
-    private $userId;
-    private $apiKey;
+    private $username;
+    private $password;
     private $debug;
+    private $uid = null;
 
     /**
      * Constructor
@@ -35,15 +36,125 @@ class OdooHelper
     {
         $params = ComponentHelper::getParams('com_cotizaciones');
         
-        $this->url = $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object');
+        // Extract base URL from the full URL
+        $fullUrl = $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object');
+        $this->baseUrl = str_replace('/xmlrpc/2/object', '', $fullUrl);
+        
         $this->database = $params->get('odoo_database', 'grupoimpre');
-        $this->userId = (int) $params->get('odoo_user_id', 2);
-        $this->apiKey = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
+        $this->username = $params->get('odoo_username', 'admin'); // We need username, not user ID
+        $this->password = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
         $this->debug = $params->get('enable_debug', 0);
     }
 
     /**
-     * Make XML-RPC call to Odoo using cURL
+     * Authenticate with Odoo and get UID
+     *
+     * @return  boolean  True if authentication successful
+     */
+    private function authenticate()
+    {
+        if ($this->uid !== null) {
+            return true; // Already authenticated
+        }
+
+        try {
+            $url = $this->baseUrl . '/xmlrpc/2/common';
+            
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>authenticate</methodName>
+    <params>
+        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($this->username) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
+        <param><value><struct></struct></value></param>
+    </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($url, $xmlRequest);
+            
+            if ($response === false) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Authentication failed: No response from server', 'error');
+                }
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+            
+            if ($result === false || !is_numeric($result)) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Authentication failed: Invalid response - ' . print_r($result, true), 'error');
+                }
+                return false;
+            }
+
+            $this->uid = (int) $result;
+            
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Authentication successful. UID: ' . $this->uid, 'info');
+            }
+            
+            return true;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Authentication error: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Make cURL request to Odoo
+     *
+     * @param   string  $url     The URL to call
+     * @param   string  $xmlData The XML data to send
+     *
+     * @return  string|false  Response or false on error
+     */
+    private function makeCurlRequest($url, $xmlData)
+    {
+        $ch = curl_init();
+        
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $xmlData,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: text/xml',
+                'Content-Length: ' . strlen($xmlData)
+            ],
+            CURLOPT_SSL_VERIFYPEER => false, // For development - should be true in production
+            CURLOPT_SSL_VERIFYHOST => false, // For development - should be true in production
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false || !empty($error)) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('cURL Error: ' . $error, 'error');
+            }
+            return false;
+        }
+
+        if ($httpCode !== 200) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('HTTP Error: ' . $httpCode . ' - Response: ' . substr($response, 0, 500), 'error');
+            }
+            return false;
+        }
+
+        return $response;
+    }
+
+    /**
+     * Make XML-RPC call to Odoo
      *
      * @param   string  $model   The Odoo model
      * @param   string  $method  The method to call
@@ -53,15 +164,20 @@ class OdooHelper
      */
     private function odooCall($model, $method, $args = [])
     {
+        if (!$this->authenticate()) {
+            return false;
+        }
+
         try {
-            // Build the XML-RPC request manually
+            $url = $this->baseUrl . '/xmlrpc/2/object';
+            
             $xmlRequest = '<?xml version="1.0"?>
 <methodCall>
     <methodName>execute_kw</methodName>
     <params>
         <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><int>' . $this->userId . '</int></value></param>
-        <param><value><string>' . htmlspecialchars($this->apiKey) . '</string></value></param>
+        <param><value><int>' . $this->uid . '</int></value></param>
+        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
         <param><value><string>' . htmlspecialchars($model) . '</string></value></param>
         <param><value><string>' . htmlspecialchars($method) . '</string></value></param>
         <param><value><array><data>';
@@ -75,48 +191,18 @@ class OdooHelper
     </params>
 </methodCall>';
 
-            // Initialize cURL
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $this->url);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $xmlRequest);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'Content-Type: text/xml',
-                'Content-Length: ' . strlen($xmlRequest)
-            ]);
-
-            // Execute request
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $error = curl_error($ch);
-            curl_close($ch);
-
-            if ($response === false || !empty($error)) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('cURL Error: ' . $error, 'error');
-                }
+            $response = $this->makeCurlRequest($url, $xmlRequest);
+            
+            if ($response === false) {
                 return false;
             }
 
-            if ($httpCode !== 200) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('HTTP Error: ' . $httpCode, 'error');
-                }
-                return false;
-            }
-
-            // Parse XML response
             $result = $this->parseXmlResponse($response);
             
-            if ($result === false) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Failed to parse Odoo response', 'error');
-                }
-                return false;
+            if ($this->debug && $method === 'search') {
+                Factory::getApplication()->enqueueMessage('Odoo call result for ' . $model . '.' . $method . ': ' . print_r($result, true), 'info');
             }
-
+            
             return $result;
 
         } catch (Exception $e) {
@@ -187,7 +273,9 @@ class OdooHelper
             $fault = $dom->getElementsByTagName('fault');
             if ($fault->length > 0) {
                 if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Odoo returned a fault response', 'error');
+                    $faultValue = $fault->item(0)->getElementsByTagName('value')->item(0);
+                    $faultData = $this->parseValue($faultValue);
+                    Factory::getApplication()->enqueueMessage('Odoo fault: ' . print_r($faultData, true), 'error');
                 }
                 return false;
             }
@@ -524,21 +612,7 @@ class OdooHelper
      */
     public function testConnection()
     {
-        try {
-            // First test a simple search to verify connection
-            $result = $this->odooCall('res.partner', 'search', [[], ['limit' => 1]]);
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Connection test result: ' . print_r($result, true), 'info');
-            }
-            
-            return is_array($result);
-        } catch (Exception $e) {
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Connection test failed: ' . $e->getMessage(), 'error');
-            }
-            return false;
-        }
+        return $this->authenticate();
     }
 
     /**
@@ -549,12 +623,14 @@ class OdooHelper
     public function getConnectionStatus()
     {
         $status = [
-            'url' => $this->url,
+            'base_url' => $this->baseUrl,
             'database' => $this->database,
-            'user_id' => $this->userId,
-            'api_key_set' => !empty($this->apiKey),
+            'username' => $this->username,
+            'password_set' => !empty($this->password),
             'curl_available' => function_exists('curl_init'),
             'connection_test' => false,
+            'authentication_test' => false,
+            'uid' => null,
             'error_message' => ''
         ];
 
@@ -567,12 +643,15 @@ class OdooHelper
             }
             curl_close($ch);
 
-            // Test Odoo connection
-            $result = $this->testConnection();
-            $status['connection_test'] = $result;
+            // Test authentication
+            $authResult = $this->authenticate();
+            $status['authentication_test'] = $authResult;
+            $status['uid'] = $this->uid;
             
-            if (!$result) {
-                $status['error_message'] = 'Odoo connection test failed';
+            if ($authResult) {
+                $status['connection_test'] = true;
+            } else {
+                $status['error_message'] = 'Authentication failed - check username/password';
             }
 
         } catch (Exception $e) {

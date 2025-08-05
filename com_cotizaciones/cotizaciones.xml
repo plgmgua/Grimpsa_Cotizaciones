@@ -63,6 +63,14 @@
                     required="true"
                 />
                 <field
+                    name="odoo_username"
+                    type="text"
+                    label="COM_COTIZACIONES_CONFIG_ODOO_USERNAME_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ODOO_USERNAME_DESC"
+                    default="admin"
+                    required="true"
+                />
+                <field
                     name="odoo_api_key"
                     type="password"
                     label="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_LABEL"
