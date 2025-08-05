@@ -338,6 +338,151 @@
     border-color: #28a745;
 }
 
+/* Excel-style Column Filter Styles */
+.filterable-column {
+    position: relative;
+}
+
+.column-header-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.column-filter-btn {
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.column-filter-btn:hover {
+    opacity: 1;
+    color: #fff !important;
+}
+
+.filter-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    min-width: 300px;
+    max-width: 400px;
+    z-index: 1000;
+    color: #495057;
+}
+
+.filter-dropdown-header {
+    background-color: #28a745;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.filter-dropdown-body {
+    padding: 16px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.filter-dropdown-footer {
+    padding: 12px 16px;
+    border-top: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    border-radius: 0 0 8px 8px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.filter-search input {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.filter-options {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.client-option {
+    padding: 6px 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.client-option:last-child {
+    border-bottom: none;
+}
+
+.client-option .form-check-input {
+    margin-top: 0.125rem;
+}
+
+.client-option .form-check-label {
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding-left: 0.25rem;
+}
+
+.client-option:hover {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+/* Filter indicator styles */
+.filter-active {
+    background-color: rgba(40, 167, 69, 0.1) !important;
+}
+
+.filter-active .column-filter-btn {
+    color: #28a745 !important;
+    opacity: 1;
+}
+
+/* Responsive adjustments for filter dropdown */
+@media (max-width: 768px) {
+    .filter-dropdown {
+        min-width: 280px;
+        max-width: 90vw;
+        left: -50px;
+    }
+    
+    .filter-dropdown-body {
+        max-height: 250px;
+    }
+    
+    .filter-actions {
+        flex-direction: column;
+    }
+    
+    .filter-actions .btn {
+        width: 100%;
+        margin-bottom: 4px;
+    }
+}
+
+/* Scrollbar styling for filter options */
+.filter-options::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filter-options::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.filter-options::-webkit-scrollbar-thumb {
+    background: #28a745;
+    border-radius: 3px;
+}
+
+.filter-options::-webkit-scrollbar-thumb:hover {
+    background: #1e7e34;
+}
 /* Table improvements */
 .table-hover tbody tr:hover td {
     background-color: rgba(40, 167, 69, 0.1);

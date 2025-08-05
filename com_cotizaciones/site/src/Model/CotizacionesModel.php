@@ -190,6 +190,10 @@ class CotizacionesModel extends ListModel
         $search = $app->input->get('filter_search', '', 'string');
         $search = trim($search);
         $this->setState('filter.search', $search);
+        
+        // Get the client filter
+        $clientFilter = $app->input->get('filter_clients', [], 'array');
+        $this->setState('filter.clients', $clientFilter);
 
         // Set the ordering
         $this->setState('list.ordering', $ordering);

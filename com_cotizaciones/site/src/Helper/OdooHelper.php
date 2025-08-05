@@ -191,6 +191,134 @@ class OdooHelper
     }
 
     /**
+     * Get distinct clients for the current sales agent
+     *
+     * @param   string  $agentName  The sales agent name
+     *
+     * @return  array  Array of distinct clients
+     */
+    public function getDistinctClientsByAgent($agentName)
+    {
+        // First, try to find the custom sales agent field
+        $salesAgentField = $this->findSalesAgentFieldInQuotes();
+        
+        if (!$salesAgentField) {
+            $salesAgentField = 'x_studio_agente_de_ventas_1';
+        }
+        
+        $xmlPayload = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>grupoimpre</string></value>
+      </param>
+      <param>
+         <value><int>2</int></value>
+      </param>
+      <param>
+         <value><string>2386bb5ae66c7fd9022feaf82148680c4cf4ce3b</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>search_read</string></value>
+      </param>
+      <param>
+         <value>
+            <array>
+               <data>
+                  <value>
+                     <array>
+                        <data>
+                           <value>
+                              <array>
+                                 <data>
+                                    <value><string>' . $salesAgentField . '</string></value>
+                                    <value><string>=</string></value>
+                                    <value><string>' . htmlspecialchars($agentName, ENT_XML1, 'UTF-8') . '</string></value>
+                                 </data>
+                              </array>
+                           </value>
+                        </data>
+                     </array>
+                  </value>
+               </data>
+            </array>
+         </value>
+      </param>
+      <param>
+         <value>
+            <struct>
+               <member>
+                  <name>fields</name>
+                  <value>
+                     <array>
+                        <data>
+                           <value><string>partner_id</string></value>
+                        </data>
+                     </array>
+                  </value>
+               </member>
+            </struct>
+         </value>
+      </param>
+   </params>
+</methodCall>';
+
+        $result = $this->executeOdooCall($xmlPayload);
+        
+        if (!$result) {
+            return [];
+        }
+
+        // Parse the response to get unique partner IDs and names
+        $clients = [];
+        $uniqueClients = [];
+        
+        if (isset($result['params']['param']['value']['array']['data']['value'])) {
+            $values = $result['params']['param']['value']['array']['data']['value'];
+
+            // Handle single quote response
+            if (isset($values['struct'])) {
+                $values = [$values];
+            }
+
+            foreach ($values as $value) {
+                if (!isset($value['struct']['member'])) {
+                    continue;
+                }
+
+                foreach ($value['struct']['member'] as $member) {
+                    if ($member['name'] === 'partner_id' && isset($member['value']['array']['data']['value'])) {
+                        $arrayData = $member['value']['array']['data']['value'];
+                        if (is_array($arrayData) && count($arrayData) >= 2) {
+                            $clientId = isset($arrayData[0]['int']) ? (string)$arrayData[0]['int'] : '';
+                            $clientName = isset($arrayData[1]['string']) ? $arrayData[1]['string'] : '';
+                            
+                            if (!empty($clientId) && !empty($clientName) && !isset($uniqueClients[$clientId])) {
+                                $uniqueClients[$clientId] = true;
+                                $clients[] = [
+                                    'id' => $clientId,
+                                    'name' => $clientName
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Sort clients by name
+        usort($clients, function($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+        
+        return $clients;
+    }
+
+    /**
      * Get quotes by sales agent
      *
      * @param   string   $agentName  The sales agent name
@@ -222,16 +350,42 @@ class OdooHelper
      * @param   integer  $page             The page number
      * @param   integer  $limit            The number of quotes per page
      * @param   string   $search           The search term
+     * @param   array    $clientFilter     Array of client IDs to filter by
      *
      * @return  array  Array of quotes
      */
-    private function getQuotesByCustomField($agentName, $salesAgentField, $page = 1, $limit = 20, $search = '')
+    private function getQuotesByCustomField($agentName, $salesAgentField, $page = 1, $limit = 20, $search = '', $clientFilter = [])
     {
         // Build search conditions
         $searchConditions = '';
         
-        // If search term is provided, search by client name
-        if (!empty($search)) {
+        // If client filter is provided, filter by specific client IDs
+        if (!empty($clientFilter) && is_array($clientFilter)) {
+            $clientIdsXml = '';
+            foreach ($clientFilter as $clientId) {
+                if (is_numeric($clientId)) {
+                    $clientIdsXml .= '<value><int>' . (int)$clientId . '</int></value>';
+                }
+            }
+            
+            if (!empty($clientIdsXml)) {
+                $searchConditions = '<value>
+                    <array>
+                        <data>
+                            <value><string>partner_id</string></value>
+                            <value><string>in</string></value>
+                            <value>
+                                <array>
+                                    <data>' . $clientIdsXml . '</data>
+                                </array>
+                            </value>
+                        </data>
+                    </array>
+                </value>';
+            }
+        }
+        // If search term is provided and no client filter, search by client name
+        elseif (!empty($search)) {
             // First get client IDs that match the search term
             $clientIds = $this->searchClientIdsByName($search, $agentName);
             

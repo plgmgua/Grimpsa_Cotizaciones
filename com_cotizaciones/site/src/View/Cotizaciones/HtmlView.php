@@ -77,12 +77,14 @@ class HtmlView extends BaseHtmlView
             $this->items = $this->get('Items');
             $this->pagination = $this->get('Pagination');
             $this->state = $this->get('State');
+            $this->distinctClients = $this->get('DistinctClients');
             $this->params = ComponentHelper::getParams('com_cotizaciones');
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults
             $this->items = [];
             $this->pagination = null;
             $this->state = new \Joomla\Registry\Registry();
+            $this->distinctClients = [];
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
             // Log the error for debugging
@@ -95,6 +97,7 @@ class HtmlView extends BaseHtmlView
             $this->items = [];
             $this->pagination = null;
             $this->state = new \Joomla\Registry\Registry();
+            $this->distinctClients = [];
         }
 
         $this->addToolbar();
