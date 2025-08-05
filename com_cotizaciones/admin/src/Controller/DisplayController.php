@@ -35,6 +35,13 @@ class DisplayController extends BaseController
      */
     public function display($cachable = false, $urlparams = [])
     {
+        $view = $this->input->get('view', $this->default_view);
+        
+        // Allow config view
+        if ($view === 'config') {
+            $this->input->set('view', 'config');
+        }
+        
         return parent::display($cachable, $urlparams);
     }
 }

@@ -43,7 +43,7 @@ use Joomla\CMS\Router\Route;
                             <div class="card-body">
                                 <h5 class="card-title"><?php echo Text::_('COM_COTIZACIONES_DASHBOARD_CONFIGURATION'); ?></h5>
                                 <p class="card-text"><?php echo Text::_('COM_COTIZACIONES_DASHBOARD_CONFIGURATION_DESC'); ?></p>
-                                <a href="<?php echo Route::_('index.php?option=com_config&view=component&component=com_cotizaciones'); ?>" 
+                                <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=config'); ?>" 
                                    class="btn btn-light">
                                     <?php echo Text::_('COM_COTIZACIONES_DASHBOARD_CONFIGURE'); ?>
                                 </a>

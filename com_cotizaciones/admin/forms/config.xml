@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<form>
+    <fieldset name="odoo_connection" label="COM_COTIZACIONES_CONFIG_ODOO_CONNECTION">
+        <field
+            name="odoo_url"
+            type="text"
+            label="COM_COTIZACIONES_CONFIG_ODOO_URL_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ODOO_URL_DESC"
+            class="form-control"
+            required="true"
+            size="60"
+        />
+
+        <field
+            name="odoo_database"
+            type="text"
+            label="COM_COTIZACIONES_CONFIG_ODOO_DATABASE_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ODOO_DATABASE_DESC"
+            class="form-control"
+            required="true"
+        />
+
+        <field
+            name="odoo_username"
+            type="text"
+            label="COM_COTIZACIONES_CONFIG_ODOO_USERNAME_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ODOO_USERNAME_DESC"
+            class="form-control"
+            required="true"
+        />
+
+        <field
+            name="odoo_api_key"
+            type="password"
+            label="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_DESC"
+            class="form-control"
+            required="true"
+            size="60"
+        />
+    </fieldset>
+
+    <fieldset name="display_options" label="COM_COTIZACIONES_CONFIG_DISPLAY_OPTIONS">
+        <field
+            name="quotes_per_page"
+            type="number"
+            label="COM_COTIZACIONES_CONFIG_QUOTES_PER_PAGE_LABEL"
+            description="COM_COTIZACIONES_CONFIG_QUOTES_PER_PAGE_DESC"
+            class="form-control"
+            default="20"
+            min="5"
+            max="100"
+        />
+    </fieldset>
+
+    <fieldset name="advanced_options" label="COM_COTIZACIONES_CONFIG_ADVANCED_OPTIONS">
+        <field
+            name="connection_timeout"
+            type="number"
+            label="COM_COTIZACIONES_CONFIG_CONNECTION_TIMEOUT_LABEL"
+            description="COM_COTIZACIONES_CONFIG_CONNECTION_TIMEOUT_DESC"
+            class="form-control"
+            default="30"
+            min="10"
+            max="120"
+        />
+
+        <field
+            name="enable_ssl_verify"
+            type="radio"
+            label="COM_COTIZACIONES_CONFIG_ENABLE_SSL_VERIFY_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ENABLE_SSL_VERIFY_DESC"
+            default="0"
+            class="btn-group btn-group-yesno"
+        >
+            <option value="1">JYES</option>
+            <option value="0">JNO</option>
+        </field>
+
+        <field
+            name="enable_debug"
+            type="radio"
+            label="COM_COTIZACIONES_CONFIG_ENABLE_DEBUG_LABEL"
+            description="COM_COTIZACIONES_CONFIG_ENABLE_DEBUG_DESC"
+            default="0"
+            class="btn-group btn-group-yesno"
+        >
+            <option value="1">JYES</option>
+            <option value="0">JNO</option>
+        </field>
+    </fieldset>
+</form>
