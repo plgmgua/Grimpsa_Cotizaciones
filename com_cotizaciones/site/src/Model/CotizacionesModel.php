@@ -51,8 +51,51 @@ class CotizacionesModel extends ListModel
         }
 
         try {
+            // Get all quotes for the user first
             $helper = new OdooHelper();
+            $quotes = $helper->getQuotesByAgent($user->name, 1, 1000); // Get a large number to get all quotes
             
+            if (!is_array($quotes)) {
+                return [];
+            }
+            
+            $distinctClients = [];
+            $seenClients = [];
+            
+            foreach ($quotes as $quote) {
+                if (is_array($quote) && isset($quote['partner_id'])) {
+                    $partnerId = null;
+                    $partnerName = '';
+                    
+                    // Handle different partner_id formats from Odoo
+                    if (is_array($quote['partner_id']) && count($quote['partner_id']) >= 2) {
+                        // Format: [id, "Name"]
+                        $partnerId = (int)$quote['partner_id'][0];
+                        $partnerName = trim($quote['partner_id'][1]);
+                    } elseif (is_numeric($quote['partner_id'])) {
+                        // Format: just ID
+                        $partnerId = (int)$quote['partner_id'];
+                        // Try to get name from contact_name if available
+                        $partnerName = isset($quote['contact_name']) ? $quote['contact_name'] : 'Cliente ID: ' . $partnerId;
+                    }
+                    
+                    // Only add if we have valid data and haven't seen this client before
+                    if ($partnerId && !empty($partnerName) && !isset($seenClients[$partnerId])) {
+                        $distinctClients[] = [
+                            'id' => $partnerId,
+                            'name' => $partnerName
+                        ];
+                        $seenClients[$partnerId] = true;
+                    }
+                }
+            }
+            
+            // Sort clients alphabetically by name
+            usort($distinctClients, function($a, $b) {
+                return strcmp($a['name'], $b['name']);
+            });
+            
+            return $distinctClients;
             // Get pagination and search parameters
             $limitstart = $this->getStart();
             $limit = $this->getState('list.limit', 20);
