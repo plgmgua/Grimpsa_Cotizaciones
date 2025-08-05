@@ -1030,7 +1030,7 @@ class OdooHelper
      *
      * @return  array  Array of quotes
      */
-    private function parseQuotesResponse($result)
+    private function parseQuotesWithContactNames($result)
     {
         if (!$result || !isset($result['params']['param']['value']['array']['data']['value'])) {
             return [];
@@ -1060,6 +1060,16 @@ class OdooHelper
                     $fieldValue = (string)$member['value']['int'];
                 } elseif (isset($member['value']['double'])) {
                     $fieldValue = (string)$member['value']['double'];
+                } elseif (isset($member['value']['array']['data']['value'])) {
+                    // Handle partner_id array format [id, name]
+                    $arrayData = $member['value']['array']['data']['value'];
+                    if (is_array($arrayData) && count($arrayData) >= 2) {
+                        if ($fieldName === 'partner_id') {
+                            $quote['partner_id'] = isset($arrayData[0]['int']) ? (string)$arrayData[0]['int'] : '';
+                            $quote['contact_name'] = isset($arrayData[1]['string']) ? $arrayData[1]['string'] : '';
+                            continue;
+                        }
+                    }
                 }
                 
                 $quote[$fieldName] = $fieldValue;
@@ -1069,6 +1079,18 @@ class OdooHelper
         }
 
         return $quotes;
+    }
+
+    /**
+     * Parse quotes response from Odoo (fallback method)
+     *
+     * @param   mixed  $result  The API response
+     *
+     * @return  array  Array of quotes
+     */
+    private function parseQuotesResponse($result)
+    {
+        return $this->parseQuotesWithContactNames($result);
     }
 
     /**
@@ -1084,6 +1106,7 @@ class OdooHelper
             'id' => isset($quote['id']) ? $quote['id'] : '0',
             'name' => isset($quote['name']) ? $quote['name'] : '',
             'partner_id' => isset($quote['partner_id']) ? $quote['partner_id'] : '0',
+            'contact_name' => isset($quote['contact_name']) ? $quote['contact_name'] : '',
             'date_order' => isset($quote['date_order']) ? $quote['date_order'] : '',
             'amount_total' => isset($quote['amount_total']) ? $quote['amount_total'] : '0.00',
             'state' => isset($quote['state']) ? $quote['state'] : 'draft',

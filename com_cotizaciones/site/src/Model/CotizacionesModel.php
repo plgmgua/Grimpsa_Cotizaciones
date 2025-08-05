@@ -67,6 +67,13 @@ class CotizacionesModel extends ListModel
                 return [];
             }
             
+            // Sort quotes by date_order (newest first)
+            usort($quotes, function($a, $b) {
+                $dateA = isset($a['date_order']) ? strtotime($a['date_order']) : 0;
+                $dateB = isset($b['date_order']) ? strtotime($b['date_order']) : 0;
+                return $dateB - $dateA; // Descending order (newest first)
+            });
+            
             // Validate and normalize each quote
             $validQuotes = [];
             foreach ($quotes as $quote) {
@@ -76,6 +83,7 @@ class CotizacionesModel extends ListModel
                         'id' => isset($quote['id']) ? (string)$quote['id'] : '0',
                         'name' => isset($quote['name']) && is_string($quote['name']) ? $quote['name'] : '',
                         'partner_id' => isset($quote['partner_id']) ? (string)$quote['partner_id'] : '0',
+                        'contact_name' => isset($quote['contact_name']) && is_string($quote['contact_name']) ? $quote['contact_name'] : '',
                         'date_order' => isset($quote['date_order']) && is_string($quote['date_order']) ? $quote['date_order'] : '',
                         'amount_total' => isset($quote['amount_total']) ? (string)$quote['amount_total'] : '0.00',
                         'state' => isset($quote['state']) && is_string($quote['state']) ? $quote['state'] : 'draft',
@@ -126,8 +134,19 @@ class CotizacionesModel extends ListModel
      */
     public function getTotal()
     {
-        // For now, we'll return a reasonable number since Odoo doesn't easily provide total counts
-        return 100;
+        $user = Factory::getUser();
+        
+        if ($user->guest) {
+            return 0;
+        }
+
+        try {
+            $helper = new OdooHelper();
+            $quotes = $helper->getQuotesByAgent($user->name, 1, 1000); // Get a large number to count
+            return is_array($quotes) ? count($quotes) : 0;
+        } catch (Exception $e) {
+            return 0;
+        }
     }
 
     /**

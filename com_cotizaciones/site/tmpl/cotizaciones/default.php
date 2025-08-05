@@ -75,14 +75,14 @@ function getStateLabel($state) {
     <!-- Main Actions Ribbon -->
     <div class="quotes-ribbon">
         <div class="row">
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="adminForm" id="adminForm">
                     <div class="input-group">
                         <span class="input-group-text">
                             <i class="fas fa-search"></i>
                         </span>
                         <input type="text" name="filter_search" id="filter_search" 
-                               value="" 
+                               value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" 
                                class="form-control" 
                                placeholder="Buscar por número, cliente..." />
                         <button class="btn btn-outline-secondary" type="submit">
@@ -93,13 +93,30 @@ function getStateLabel($state) {
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
-            <div class="col-md-4 text-end">
+            <div class="col-md-3">
+                <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="limitForm" id="limitForm">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-list"></i>
+                        </span>
+                        <select name="limit" class="form-select" onchange="this.form.submit()">
+                            <option value="20" <?php echo ($this->state->get('list.limit', 20) == 20) ? 'selected' : ''; ?>>20 por página</option>
+                            <option value="30" <?php echo ($this->state->get('list.limit', 20) == 30) ? 'selected' : ''; ?>>30 por página</option>
+                            <option value="50" <?php echo ($this->state->get('list.limit', 20) == 50) ? 'selected' : ''; ?>>50 por página</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="task" value="" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" />
+                    <?php echo HTMLHelper::_('form.token'); ?>
+                </form>
+            </div>
+            <div class="col-md-3 text-end">
                 <div class="btn-group" role="group">
                     <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0'); ?>" 
                        class="btn btn-success btn-lg">
                         <i class="fas fa-plus"></i> Nueva Cotización
                     </a>
-                    <button type="button" class="btn btn-info btn-lg" onclick="window.location.reload()">
+                    <button type="button" class="btn btn-info" onclick="window.location.reload()">
                         <i class="fas fa-sync-alt"></i> Actualizar
                     </button>
                 </div>
@@ -122,22 +139,17 @@ function getStateLabel($state) {
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
                     <tr>
-                        <th width="5%" class="text-center">ID</th>
-                        <th width="20%">Número</th>
-                        <th width="25%">Cliente</th>
+                        <th width="25%">Número</th>
+                        <th width="30%">Cliente</th>
                         <th width="15%">Fecha</th>
                         <th width="15%">Total</th>
-                        <th width="10%">Estado</th>
-                        <th width="10%" class="text-center">Acciones</th>
+                        <th width="15%">Estado</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($this->items as $i => $item): ?>
                         <?php if (!is_array($item)) continue; ?>
                         <tr>
-                            <td class="text-center">
-                                <span class="badge bg-secondary"><?php echo (int)safeGet($item, 'id', 0); ?></span>
-                            </td>
                             <td>
                                 <div class="quote-name">
                                     <strong>
@@ -154,9 +166,8 @@ function getStateLabel($state) {
                                 if (!empty($contactName)): 
                                 ?>
                                     <strong><?php echo safeEscape($contactName); ?></strong>
-                                    <br><small class="text-muted">ID: <?php echo safeEscape(safeGet($item, 'partner_id')); ?></small>
                                 <?php else: ?>
-                                    <span class="text-muted">-</span>
+                                    <span class="text-muted">Cliente no disponible</span>
                                 <?php endif; ?>
                             </td>
                             <td>
@@ -187,73 +198,17 @@ function getStateLabel($state) {
                                 ?>
                                 <span class="badge <?php echo $badgeClass; ?>"><?php echo $stateLabel; ?></span>
                             </td>
-                            <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <!-- Edit Quote Button -->
-                                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)safeGet($item, 'id', 0)); ?>" 
-                                       class="btn btn-outline-primary btn-sm" 
-                                       title="Editar Cotización">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                    
-                                    <!-- Delete Button -->
-                                    <button type="button" 
-                                            class="btn btn-outline-danger btn-sm" 
-                                            onclick="deleteQuote(<?php echo (int)safeGet($item, 'id', 0); ?>, '<?php echo addslashes(safeGet($item, 'name', 'Sin número')); ?>')" 
-                                            title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            
+            <!-- Pagination -->
+            <?php if ($this->pagination && $this->pagination->getPagesTotal() > 1): ?>
+                <div class="d-flex justify-content-center mt-4">
+                    <?php echo $this->pagination->getListFooter(); ?>
+                </div>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteModalLabel">Confirmar Eliminación</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Estás seguro de que quieres eliminar esta cotización?</p>
-                <p><strong id="deleteQuoteName"></strong></p>
-                <p class="text-muted">Esta acción no se puede deshacer.</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <form id="deleteForm" method="post" style="display: inline;">
-                    <input type="hidden" name="task" value="cotizacion.delete" />
-                    <input type="hidden" name="id" id="deleteQuoteId" value="" />
-                    <?php echo HTMLHelper::_('form.token'); ?>
-                    <button type="submit" class="btn btn-danger">Eliminar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function deleteQuote(quoteId, quoteName) {
-    document.getElementById('deleteQuoteId').value = quoteId;
-    document.getElementById('deleteQuoteName').textContent = quoteName;
-    
-    // Initialize Bootstrap modal
-    var deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    deleteModal.show();
-}
-
-// Set form action to current page
-document.addEventListener('DOMContentLoaded', function() {
-    var deleteForm = document.getElementById('deleteForm');
-    if (deleteForm) {
-        deleteForm.action = window.location.href.split('?')[0] + '?option=com_cotizaciones&view=cotizaciones';
-    }
-});
-</script>

@@ -49,6 +49,12 @@
     font-weight: 500;
 }
 
+.quotes-ribbon .form-select {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background-color: white;
+}
+
 .quotes-table-container {
     background: white;
     border-radius: 8px;
@@ -78,6 +84,7 @@
 
 .quotes-table-container tbody tr:hover {
     background-color: #f8f9fa;
+    cursor: pointer;
 }
 
 .quote-name {
@@ -294,11 +301,34 @@
 
 .page-link {
     color: #28a745;
+    border-color: #28a745;
 }
 
 .page-item.active .page-link {
     background-color: #28a745;
     border-color: #28a745;
+}
+
+.page-link:hover {
+    color: #1e7e34;
+    background-color: #d4edda;
+    border-color: #28a745;
+}
+
+/* Table improvements */
+.table-hover tbody tr:hover td {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.quote-name a {
+    font-weight: 600;
+    color: #495057;
+    transition: color 0.2s ease;
+}
+
+.quote-name a:hover {
+    color: #28a745;
+    text-decoration: none;
 }
 
 /* Client Selector Styles */
