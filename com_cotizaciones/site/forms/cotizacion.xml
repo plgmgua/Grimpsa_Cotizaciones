@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<form>
+    <fieldset name="details" label="COM_COTIZACIONES_FIELDSET_DETAILS">
+        <field
+            name="id"
+            type="hidden"
+        />
+
+        <field
+            name="name"
+            type="text"
+            label="COM_COTIZACIONES_FIELD_NAME"
+            description="COM_COTIZACIONES_FIELD_NAME_DESC"
+            class="form-control"
+            readonly="true"
+        />
+
+        <field
+            name="partner_id"
+            type="text"
+            label="COM_COTIZACIONES_FIELD_PARTNER_ID"
+            description="COM_COTIZACIONES_FIELD_PARTNER_ID_DESC"
+            class="form-control"
+            required="true"
+        />
+
+        <field
+            name="date_order"
+            type="calendar"
+            label="COM_COTIZACIONES_FIELD_DATE_ORDER"
+            description="COM_COTIZACIONES_FIELD_DATE_ORDER_DESC"
+            class="form-control"
+            format="%Y-%m-%d"
+            required="true"
+        />
+
+        <field
+            name="amount_total"
+            type="text"
+            label="COM_COTIZACIONES_FIELD_AMOUNT_TOTAL"
+            description="COM_COTIZACIONES_FIELD_AMOUNT_TOTAL_DESC"
+            class="form-control"
+            readonly="true"
+        />
+
+        <field
+            name="state"
+            type="list"
+            label="COM_COTIZACIONES_FIELD_STATE"
+            description="COM_COTIZACIONES_FIELD_STATE_DESC"
+            default="draft"
+        >
+            <option value="draft">COM_COTIZACIONES_STATE_DRAFT</option>
+            <option value="sent">COM_COTIZACIONES_STATE_SENT</option>
+            <option value="sale">COM_COTIZACIONES_STATE_SALE</option>
+            <option value="done">COM_COTIZACIONES_STATE_DONE</option>
+            <option value="cancel">COM_COTIZACIONES_STATE_CANCEL</option>
+        </field>
+
+        <field
+            name="note"
+            type="textarea"
+            label="COM_COTIZACIONES_FIELD_NOTE"
+            description="COM_COTIZACIONES_FIELD_NOTE_DESC"
+            class="form-control"
+            rows="4"
+        />
+    </fieldset>
+</form>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+    <layout title="Lista de Cotizaciones">
+        <message>
+            <![CDATA[Muestra la lista de cotizaciones del usuario actual basada en el campo agente de ventas de Odoo]]>
+        </message>
+    </layout>
+</metadata>

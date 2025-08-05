@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+    <layout title="Editar Cotización">
+        <message>
+            <![CDATA[Formulario para editar una cotización existente]]>
+        </message>
+    </layout>
+</metadata>

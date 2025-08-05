@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="component" version="5.0" method="upgrade">
+    <name>COM_COTIZACIONES</name>
+    <author>Grimpsa</author>
+    <creationDate>2025-01-27</creationDate>
+    <copyright>Copyright (C) 2025 Grimpsa. All rights reserved.</copyright>
+    <license>GNU General Public License version 2 or later</license>
+    <authorEmail>admin@grimpsa.com</authorEmail>
+    <authorUrl>https://grimpsa.com</authorUrl>
+    <version>1.0.0</version>
+    <description>COM_COTIZACIONES_XML_DESCRIPTION</description>
+
+    <namespace path="src">Grimpsa\Component\Cotizaciones</namespace>
+
+    <files folder="site">
+        <folder>src</folder>
+        <folder>tmpl</folder>
+        <folder>language</folder>
+        <folder>forms</folder>
+    </files>
+
+    <media destination="com_cotizaciones" folder="media">
+        <folder>css</folder>
+        <folder>js</folder>
+    </media>
+
+    <administration>
+        <menu img="class:file-invoice-dollar">COM_COTIZACIONES</menu>
+        <files folder="admin">
+            <filename>services/provider.php</filename>
+            <folder>forms</folder>
+            <folder>src</folder>
+            <folder>tmpl</folder>
+            <folder>language</folder>
+        </files>
+    </administration>
+
+    <config>
+        <fields name="params">
+            <fieldset name="component" label="COM_COTIZACIONES_CONFIG_COMPONENT_LABEL">
+                <field
+                    name="odoo_url"
+                    type="text"
+                    label="COM_COTIZACIONES_CONFIG_ODOO_URL_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ODOO_URL_DESC"
+                    default="https://grupoimpre.odoo.com/xmlrpc/2/object"
+                    required="true"
+                />
+                <field
+                    name="odoo_database"
+                    type="text"
+                    label="COM_COTIZACIONES_CONFIG_ODOO_DATABASE_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ODOO_DATABASE_DESC"
+                    default="grupoimpre"
+                    required="true"
+                />
+                <field
+                    name="odoo_user_id"
+                    type="text"
+                    label="COM_COTIZACIONES_CONFIG_ODOO_USER_ID_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ODOO_USER_ID_DESC"
+                    default="2"
+                    required="true"
+                />
+                <field
+                    name="odoo_api_key"
+                    type="password"
+                    label="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_DESC"
+                    default="2386bb5ae66c7fd9022feaf82148680c4cf4ce3b"
+                    required="true"
+                />
+                <field
+                    name="quotes_per_page"
+                    type="number"
+                    label="COM_COTIZACIONES_CONFIG_QUOTES_PER_PAGE_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_QUOTES_PER_PAGE_DESC"
+                    default="20"
+                    min="5"
+                    max="100"
+                />
+                <field
+                    name="enable_debug"
+                    type="radio"
+                    label="COM_COTIZACIONES_CONFIG_ENABLE_DEBUG_LABEL"
+                    description="COM_COTIZACIONES_CONFIG_ENABLE_DEBUG_DESC"
+                    default="0"
+                    class="btn-group btn-group-yesno"
+                >
+                    <option value="1">JYES</option>
+                    <option value="0">JNO</option>
+                </field>
+            </fieldset>
+        </fields>
+    </config>
+
+    <updateservers>
+        <server type="extension" priority="1" name="Cotizaciones Updates">
+            <![CDATA[https://grimpsa.com/updates/com_cotizaciones.xml]]>
+        </server>
+    </updateservers>
+</extension>
