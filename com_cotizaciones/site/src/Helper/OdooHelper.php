@@ -1259,6 +1259,31 @@ class OdooHelper
     }
 
     /**
+     * Search for clients in Odoo
+     *
+     * @param   string  $search  Search term
+     *
+     * @return  array  Array of clients
+     */
+    public function searchClients($search)
+    {
+        try {
+            $domain = [
+                ['name', 'ilike', $search],
+                ['is_company', '=', true]
+            ];
+            
+            $fields = ['id', 'name', 'vat', 'email'];
+            
+            $clients = $this->client->call($this->database, $this->uid, $this->password, 'res.partner', 'search_read', [$domain], ['fields' => $fields, 'limit' => 20]);
+            
+            return is_array($clients) ? $clients : [];
+        } catch (Exception $e) {
+            throw new Exception('Error searching clients: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Create a new product in Odoo
      *
      * @param   string  $name         Product name/description
@@ -1270,7 +1295,7 @@ class OdooHelper
     public function createProduct($name, $productCode, $price = 0.0)
     {
         try {
-            $models = $this->getModelsConnection();
+            $productCode = $defaultCode ?: 'PROD-' . uniqid();
             
             $productData = [
                 'name' => $name,

@@ -160,7 +160,8 @@ $user = Factory::getUser();
                         </div>
                     </div>
 
-                    <!-- Quote Lines Section -->
+                    <!-- Quote Lines Section - Only show for existing quotes -->
+                    <?php if (!$isNew): ?>
                     <div class="card mt-4">
                         <div class="card-header">
                             <div class="d-flex justify-content-between align-items-center">
@@ -228,15 +229,12 @@ $user = Factory::getUser();
                             <div id="quote_lines_container">
                                 <div class="alert alert-info">
                                     <i class="fas fa-info-circle"></i> 
-                                    <?php if ($isNew): ?>
-                                        Agregue líneas a su cotización usando el botón "Agregar Línea"
-                                    <?php else: ?>
-                                        Cargando líneas de cotización...
-                                    <?php endif; ?>
+                                    Cargando líneas de cotización...
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Summary Information -->
@@ -265,6 +263,9 @@ $user = Factory::getUser();
                                     <li>El número se genera automáticamente</li>
                                     <li>El total se calcula en Odoo</li>
                                     <li>Agente: <?php echo safeEscape($user->name); ?></li>
+                                    <?php if ($isNew): ?>
+                                    <li><strong>Guarde primero para agregar líneas</strong></li>
+                                    <?php endif; ?>
                                 </ul>
                             </div>
                         </div>
@@ -279,9 +280,11 @@ $user = Factory::getUser();
                         <button type="button" class="btn btn-success" onclick="saveQuote()">
                             <i class="fas fa-save"></i> Guardar
                         </button>
+                        <?php if (!$isNew): ?>
                         <button type="button" class="btn btn-primary" onclick="applyQuote()">
                             <i class="fas fa-check"></i> Aplicar
                         </button>
+                        <?php endif; ?>
                     </div>
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-secondary" onclick="cancelQuote()">
@@ -295,7 +298,6 @@ $user = Factory::getUser();
         <!-- Hidden fields -->
         <input type="hidden" name="task" value="" />
         <input type="hidden" name="id" value="<?php echo (int) ($this->item->id ?? 0); ?>" />
-        <input type="hidden" name="quote_lines_data" id="quote_lines_data" value="" />
         <?php echo HTMLHelper::_('form.token'); ?>
     </form>
 </div>
@@ -303,8 +305,6 @@ $user = Factory::getUser();
 <script>
 // Global variables
 let clientSearchTimeout;
-let quoteLines = [];
-let productCounter = 1;
 let isNew = <?php echo $isNew ? 'true' : 'false'; ?>;
 
 // Client search functionality
@@ -380,8 +380,12 @@ function clearSelectedClient() {
     document.getElementById('selected_client').innerHTML = '';
 }
 
-// Quote lines functionality
+// Quote lines functionality (only for existing quotes)
 function showAddLineForm() {
+    if (isNew) {
+        alert('Debe guardar la cotización primero antes de agregar líneas');
+        return;
+    }
     document.getElementById('add_line_form').style.display = 'block';
     document.getElementById('line_description').focus();
 }
@@ -413,46 +417,102 @@ function addQuoteLine() {
         return;
     }
     
-    const newLine = {
-        id: 'temp_' + Date.now(),
-        product_code: productCounter,
-        description: description,
-        quantity: quantity,
-        price: price,
-        is_new: true
-    };
+    // Add line via AJAX
+    const quoteId = <?php echo (int)($this->item->id ?? 0); ?>;
     
-    quoteLines.push(newLine);
-    productCounter++;
-    
-    hideAddLineForm();
-    displayQuoteLines();
-    updateTotal();
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.addLine'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `quote_id=${quoteId}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            hideAddLineForm();
+            loadQuoteLines(); // Reload lines
+            alert('Línea agregada exitosamente');
+        } else {
+            alert('Error al agregar línea: ' + (data.message || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        alert('Error de conexión');
+    });
 }
 
-function displayQuoteLines() {
+function updateCharCount() {
+    const description = document.getElementById('line_description');
+    if (description) {
+        const count = description.value.length;
+        const charCountElement = document.getElementById('char_count');
+        if (charCountElement) {
+            charCountElement.textContent = count;
+            
+            if (count > 600) {
+                charCountElement.style.color = 'red';
+            } else if (count > 500) {
+                charCountElement.style.color = 'orange';
+            } else {
+                charCountElement.style.color = 'inherit';
+            }
+        }
+    }
+}
+
+// Load existing quote lines
+function loadQuoteLines() {
+    if (isNew) return;
+    
+    const quoteId = <?php echo (int)($this->item->id ?? 0); ?>;
+    
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.getLines'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'quote_id=' + quoteId + '&<?php echo Session::getFormToken(); ?>=1'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.lines) {
+            displayQuoteLines(data.lines);
+        } else {
+            document.getElementById('quote_lines_container').innerHTML = 
+                '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No hay líneas en esta cotización</div>';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading quote lines:', error);
+    });
+}
+
+function displayQuoteLines(lines) {
     const container = document.getElementById('quote_lines_container');
     
-    if (quoteLines.length === 0) {
-        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> Agregue líneas a su cotización usando el botón "Agregar Línea"</div>';
+    if (!lines || lines.length === 0) {
+        container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle"></i> No hay líneas en esta cotización</div>';
         return;
     }
     
     let html = '<div class="table-responsive"><table class="table table-striped quote-lines-table">';
     html += '<thead class="table-success"><tr>';
-    html += '<th>Código</th><th>Descripción</th><th>Cantidad</th><th>Precio Unit.</th><th>Subtotal</th><th>Acciones</th>';
+    html += '<th>Descripción</th><th>Cantidad</th><th>Precio Unit.</th><th>Subtotal</th><th>Acciones</th>';
     html += '</tr></thead><tbody>';
     
-    quoteLines.forEach((line, index) => {
-        const subtotal = line.quantity * line.price;
+    lines.forEach(line => {
+        const quantity = parseFloat(line.product_uom_qty || line.quantity || 0);
+        const price = parseFloat(line.price_unit || line.price || 0);
+        const subtotal = quantity * price;
+        
         html += `<tr>
-            <td><span class="product-badge">PROD-${line.product_code}</span></td>
-            <td>${line.description}</td>
-            <td>${parseFloat(line.quantity).toFixed(2)}</td>
-            <td class="currency-amount">Q ${parseFloat(line.price).toFixed(2)}</td>
+            <td>${line.name || line.description || ''}</td>
+            <td>${quantity.toFixed(2)}</td>
+            <td class="currency-amount">Q ${price.toFixed(2)}</td>
             <td><strong class="currency-amount">Q ${subtotal.toFixed(2)}</strong></td>
             <td>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuoteLine(${index})">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteLine(${line.id})">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -463,41 +523,33 @@ function displayQuoteLines() {
     container.innerHTML = html;
 }
 
-function removeQuoteLine(index) {
-    if (confirm('¿Eliminar esta línea de la cotización?')) {
-        quoteLines.splice(index, 1);
-        displayQuoteLines();
-        updateTotal();
-    }
-}
-
-function updateTotal() {
-    let total = 0;
-    quoteLines.forEach(line => {
-        total += line.quantity * line.price;
-    });
-    document.getElementById('jform_amount_total').value = total.toFixed(2);
-}
-
-function updateCharCount() {
-    const description = document.getElementById('line_description').value;
-    const count = description.length;
-    document.getElementById('char_count').textContent = count;
+function deleteLine(lineId) {
+    if (!confirm('¿Eliminar esta línea de la cotización?')) return;
     
-    const charCountElement = document.getElementById('char_count');
-    if (count > 600) {
-        charCountElement.style.color = 'red';
-    } else if (count > 500) {
-        charCountElement.style.color = 'orange';
-    } else {
-        charCountElement.style.color = 'inherit';
-    }
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.deleteLine'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `line_id=${lineId}&<?php echo Session::getFormToken(); ?>=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadQuoteLines(); // Reload lines
+            alert('Línea eliminada exitosamente');
+        } else {
+            alert('Error al eliminar línea: ' + (data.message || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        alert('Error de conexión');
+    });
 }
 
 // Form submission functions
 function saveQuote() {
     if (validateForm()) {
-        document.getElementById('quote_lines_data').value = JSON.stringify(quoteLines);
         document.querySelector('input[name="task"]').value = 'cotizacion.save';
         document.getElementById('adminForm').submit();
     }
@@ -505,7 +557,6 @@ function saveQuote() {
 
 function applyQuote() {
     if (validateForm()) {
-        document.getElementById('quote_lines_data').value = JSON.stringify(quoteLines);
         document.querySelector('input[name="task"]').value = 'cotizacion.apply';
         document.getElementById('adminForm').submit();
     }
@@ -532,43 +583,6 @@ function validateForm() {
     }
     
     return true;
-}
-
-// Load existing quote lines for edit mode
-function loadExistingQuoteLines() {
-    if (!isNew) {
-        const quoteId = <?php echo (int)($this->item->id ?? 0); ?>;
-        
-        fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.getLines'); ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'quote_id=' + quoteId + '&<?php echo Session::getFormToken(); ?>=1'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.lines) {
-                // Convert existing lines to our format
-                data.lines.forEach(line => {
-                    quoteLines.push({
-                        id: line.id,
-                        product_code: line.product_id || productCounter,
-                        description: line.name || line.description || '',
-                        quantity: parseFloat(line.product_uom_qty || line.quantity || 1),
-                        price: parseFloat(line.price_unit || line.price || 0),
-                        is_new: false
-                    });
-                    productCounter++;
-                });
-                displayQuoteLines();
-                updateTotal();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading quote lines:', error);
-        });
-    }
 }
 
 // Event listeners
@@ -599,9 +613,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Load existing quote lines if editing
-    loadExistingQuoteLines();
-    
-    // Initialize display
-    displayQuoteLines();
+    if (!isNew) {
+        loadQuoteLines();
+    }
 });
 </script>

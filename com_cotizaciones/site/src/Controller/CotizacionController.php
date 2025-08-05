@@ -324,6 +324,7 @@ class CotizacionController extends FormController
         // Check for request forgeries
         if (!Session::checkToken()) {
             echo json_encode(['success' => false, 'message' => 'Invalid token']);
+            $this->app->close();
             return;
         }
 
@@ -331,6 +332,7 @@ class CotizacionController extends FormController
         
         if ($user->guest) {
             echo json_encode(['success' => false, 'message' => 'Login required']);
+            $this->app->close();
             return;
         }
 
@@ -338,22 +340,18 @@ class CotizacionController extends FormController
         
         if (strlen($search) < 2) {
             echo json_encode(['success' => false, 'message' => 'Search term too short']);
+            $this->app->close();
             return;
         }
 
         try {
-            // Use the contacts helper to search clients
-            if (class_exists('\Grimpsa\Component\OdooContacts\Site\Helper\OdooHelper')) {
-                $contactsHelper = new \Grimpsa\Component\OdooContacts\Site\Helper\OdooHelper();
-                $contacts = $contactsHelper->getContactsByAgent($user->name, 1, 20, $search);
-                
-                echo json_encode([
-                    'success' => true,
-                    'clients' => $contacts
-                ]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Contacts helper not available']);
-            }
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $clients = $helper->searchClients($search);
+            
+            echo json_encode([
+                'success' => true,
+                'clients' => $clients
+            ]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
