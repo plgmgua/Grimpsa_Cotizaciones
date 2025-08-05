@@ -51,51 +51,7 @@ class CotizacionesModel extends ListModel
         }
 
         try {
-            // Get all quotes for the user first
             $helper = new OdooHelper();
-            $quotes = $helper->getQuotesByAgent($user->name, 1, 1000); // Get a large number to get all quotes
-            
-            if (!is_array($quotes)) {
-                return [];
-            }
-            
-            $distinctClients = [];
-            $seenClients = [];
-            
-            foreach ($quotes as $quote) {
-                if (is_array($quote) && isset($quote['partner_id'])) {
-                    $partnerId = null;
-                    $partnerName = '';
-                    
-                    // Handle different partner_id formats from Odoo
-                    if (is_array($quote['partner_id']) && count($quote['partner_id']) >= 2) {
-                        // Format: [id, "Name"]
-                        $partnerId = (int)$quote['partner_id'][0];
-                        $partnerName = trim($quote['partner_id'][1]);
-                    } elseif (is_numeric($quote['partner_id'])) {
-                        // Format: just ID
-                        $partnerId = (int)$quote['partner_id'];
-                        // Try to get name from contact_name if available
-                        $partnerName = isset($quote['contact_name']) ? $quote['contact_name'] : 'Cliente ID: ' . $partnerId;
-                    }
-                    
-                    // Only add if we have valid data and haven't seen this client before
-                    if ($partnerId && !empty($partnerName) && !isset($seenClients[$partnerId])) {
-                        $distinctClients[] = [
-                            'id' => $partnerId,
-                            'name' => $partnerName
-                        ];
-                        $seenClients[$partnerId] = true;
-                    }
-                }
-            }
-            
-            // Sort clients alphabetically by name
-            usort($distinctClients, function($a, $b) {
-                return strcmp($a['name'], $b['name']);
-            });
-            
-            return $distinctClients;
             // Get pagination and search parameters
             $limitstart = $this->getStart();
             $limit = $this->getState('list.limit', 20);
@@ -110,7 +66,7 @@ class CotizacionesModel extends ListModel
                 return [];
             }
             
-            // Sort quotes by date_order (newest first)
+            // Sort quotes by date_order (newest first) - this is the default order
             usort($quotes, function($a, $b) {
                 $dateA = isset($a['date_order']) ? strtotime($a['date_order']) : 0;
                 $dateB = isset($b['date_order']) ? strtotime($b['date_order']) : 0;
@@ -125,7 +81,7 @@ class CotizacionesModel extends ListModel
                     $normalizedQuote = [
                         'id' => isset($quote['id']) ? (string)$quote['id'] : '0',
                         'name' => isset($quote['name']) && is_string($quote['name']) ? $quote['name'] : '',
-                        'partner_id' => isset($quote['partner_id']) ? (string)$quote['partner_id'] : '0',
+                        'partner_id' => isset($quote['partner_id']) ? $quote['partner_id'] : '0',
                         'contact_name' => isset($quote['contact_name']) && is_string($quote['contact_name']) ? $quote['contact_name'] : '',
                         'date_order' => isset($quote['date_order']) && is_string($quote['date_order']) ? $quote['date_order'] : '',
                         'amount_total' => isset($quote['amount_total']) ? (string)$quote['amount_total'] : '0.00',
@@ -233,12 +189,8 @@ class CotizacionesModel extends ListModel
         $search = $app->input->get('filter_search', '', 'string');
         $search = trim($search);
         $this->setState('filter.search', $search);
-        
-        // Get the client filter
-        $clientFilter = $app->input->get('filter_clients', [], 'array');
-        $this->setState('filter.clients', $clientFilter);
 
-        // Set the ordering
+        // Set the ordering (newest first by default)
         $this->setState('list.ordering', $ordering);
         $this->setState('list.direction', $direction);
     }
