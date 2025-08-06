@@ -15,19 +15,18 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Component\ComponentHelper;
 
 /**
- * Helper class for Odoo integration using cURL with proper endpoints
+ * Helper class for Odoo integration using the exact working XML-RPC format
  */
 class OdooHelper
 {
     /**
      * Odoo configuration
      */
-    private $baseUrl;
+    private $url;
     private $database;
-    private $username;
-    private $password;
+    private $userId;
+    private $apiKey;
     private $debug;
-    private $uid = null;
 
     /**
      * Constructor
@@ -36,13 +35,10 @@ class OdooHelper
     {
         $params = ComponentHelper::getParams('com_cotizaciones');
         
-        // Extract base URL from the full URL
-        $fullUrl = $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object');
-        $this->baseUrl = str_replace('/xmlrpc/2/object', '', $fullUrl);
-        
+        $this->url = $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object');
         $this->database = $params->get('odoo_database', 'grupoimpre');
-        $this->username = $params->get('odoo_username', 'admin');
-        $this->password = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
+        $this->userId = (int) $params->get('odoo_user_id', 2);
+        $this->apiKey = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
         $this->debug = $params->get('enable_debug', 0);
     }
 
@@ -56,11 +52,11 @@ class OdooHelper
         $diagnostics = [
             'step' => 'Starting diagnostics',
             'config' => [
-                'base_url' => $this->baseUrl,
+                'url' => $this->url,
                 'database' => $this->database,
-                'username' => $this->username,
-                'password_set' => !empty($this->password),
-                'password_length' => strlen($this->password),
+                'user_id' => $this->userId,
+                'api_key_set' => !empty($this->apiKey),
+                'api_key_length' => strlen($this->apiKey),
             ],
             'tests' => [],
             'errors' => [],
@@ -82,39 +78,19 @@ class OdooHelper
             $diagnostics['errors'][] = 'Basic connectivity failed: ' . $connectTest['error'];
         }
 
-        // Test 3: Test common endpoint
-        $diagnostics['step'] = 'Testing common endpoint';
-        $commonTest = $this->testCommonEndpoint();
-        $diagnostics['tests']['common_endpoint'] = $commonTest['success'];
-        if (!$commonTest['success']) {
-            $diagnostics['errors'][] = 'Common endpoint failed: ' . $commonTest['error'];
+        // Test 3: Test actual Odoo call using working format
+        $diagnostics['step'] = 'Testing Odoo API call';
+        $apiTest = $this->testOdooApiCall();
+        $diagnostics['tests']['odoo_api_call'] = $apiTest['success'];
+        if (!$apiTest['success']) {
+            $diagnostics['errors'][] = 'Odoo API call failed: ' . $apiTest['error'];
         } else {
-            $diagnostics['tests']['common_response'] = $commonTest['response'];
+            $diagnostics['tests']['api_response'] = $apiTest['response'];
+            $diagnostics['success'] = true;
         }
 
-        // Test 4: Test authentication
-        $diagnostics['step'] = 'Testing authentication';
-        $authTest = $this->testAuthentication();
-        $diagnostics['tests']['authentication'] = $authTest['success'];
-        if (!$authTest['success']) {
-            $diagnostics['errors'][] = 'Authentication failed: ' . $authTest['error'];
-        } else {
-            $diagnostics['tests']['uid'] = $authTest['uid'];
-            $this->uid = $authTest['uid'];
-        }
-
-        // Test 5: Test object endpoint (only if authenticated)
-        if ($authTest['success']) {
-            $diagnostics['step'] = 'Testing object endpoint';
-            $objectTest = $this->testObjectEndpoint();
-            $diagnostics['tests']['object_endpoint'] = $objectTest['success'];
-            if (!$objectTest['success']) {
-                $diagnostics['errors'][] = 'Object endpoint failed: ' . $objectTest['error'];
-            } else {
-                $diagnostics['tests']['object_response'] = $objectTest['response'];
-            }
-
-            // Test 6: Test actual quote search
+        // Test 4: Test quote search specifically
+        if ($apiTest['success']) {
             $diagnostics['step'] = 'Testing quote search';
             $searchTest = $this->testQuoteSearch();
             $diagnostics['tests']['quote_search'] = $searchTest['success'];
@@ -122,7 +98,6 @@ class OdooHelper
                 $diagnostics['errors'][] = 'Quote search failed: ' . $searchTest['error'];
             } else {
                 $diagnostics['tests']['quotes_found'] = count($searchTest['quotes']);
-                $diagnostics['success'] = true;
             }
         }
 
@@ -135,9 +110,11 @@ class OdooHelper
      */
     private function testBasicConnectivity()
     {
+        $baseUrl = str_replace('/xmlrpc/2/object', '', $this->url);
+        
         $ch = curl_init();
         curl_setopt_array($ch, [
-            CURLOPT_URL => $this->baseUrl,
+            CURLOPT_URL => $baseUrl,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 10,
             CURLOPT_NOBODY => true, // HEAD request only
@@ -162,104 +139,46 @@ class OdooHelper
     }
 
     /**
-     * Test common endpoint
+     * Test Odoo API call using the exact working format
      */
-    private function testCommonEndpoint()
+    private function testOdooApiCall()
     {
-        $url = $this->baseUrl . '/xmlrpc/2/common';
-        
-        // Simple version call
+        // Test with a simple search_count call on res.partner
         $xmlRequest = '<?xml version="1.0"?>
 <methodCall>
-    <methodName>version</methodName>
-    <params></params>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>res.partner</string></value>
+      </param>
+      <param>
+         <value><string>search_count</string></value>
+      </param>
+      <param>
+         <value><array><data/></array></value>
+      </param>
+   </params>
 </methodCall>';
 
-        $response = $this->makeCurlRequest($url, $xmlRequest);
+        $response = $this->makeCurlRequest($this->url, $xmlRequest);
         
         if ($response === false) {
-            return ['success' => false, 'error' => 'No response from common endpoint'];
+            return ['success' => false, 'error' => 'No response from Odoo API'];
         }
 
         $result = $this->parseXmlResponse($response);
         
         if ($result === false) {
-            return ['success' => false, 'error' => 'Invalid XML response', 'raw_response' => substr($response, 0, 500)];
-        }
-
-        return ['success' => true, 'response' => $result];
-    }
-
-    /**
-     * Test authentication
-     */
-    private function testAuthentication()
-    {
-        $url = $this->baseUrl . '/xmlrpc/2/common';
-        
-        $xmlRequest = '<?xml version="1.0"?>
-<methodCall>
-    <methodName>authenticate</methodName>
-    <params>
-        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($this->username) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
-        <param><value><struct></struct></value></param>
-    </params>
-</methodCall>';
-
-        $response = $this->makeCurlRequest($url, $xmlRequest);
-        
-        if ($response === false) {
-            return ['success' => false, 'error' => 'No response from authentication'];
-        }
-
-        $result = $this->parseXmlResponse($response);
-        
-        if ($result === false || !is_numeric($result)) {
-            return ['success' => false, 'error' => 'Invalid authentication response: ' . print_r($result, true)];
-        }
-
-        return ['success' => true, 'uid' => (int) $result];
-    }
-
-    /**
-     * Test object endpoint
-     */
-    private function testObjectEndpoint()
-    {
-        if (!$this->uid) {
-            return ['success' => false, 'error' => 'No UID available'];
-        }
-
-        $url = $this->baseUrl . '/xmlrpc/2/object';
-        
-        // Test with a simple search_count call
-        $xmlRequest = '<?xml version="1.0"?>
-<methodCall>
-    <methodName>execute_kw</methodName>
-    <params>
-        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><int>' . $this->uid . '</int></value></param>
-        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
-        <param><value><string>sale.order</string></value></param>
-        <param><value><string>search_count</string></value></param>
-        <param><value><array><data>
-            <value><array><data></data></array></value>
-        </data></array></value></param>
-    </params>
-</methodCall>';
-
-        $response = $this->makeCurlRequest($url, $xmlRequest);
-        
-        if ($response === false) {
-            return ['success' => false, 'error' => 'No response from object endpoint'];
-        }
-
-        $result = $this->parseXmlResponse($response);
-        
-        if ($result === false) {
-            return ['success' => false, 'error' => 'Invalid object response', 'raw_response' => substr($response, 0, 500)];
+            return ['success' => false, 'error' => 'Invalid API response', 'raw_response' => substr($response, 0, 500)];
         }
 
         return ['success' => true, 'response' => $result];
@@ -270,32 +189,33 @@ class OdooHelper
      */
     private function testQuoteSearch()
     {
-        if (!$this->uid) {
-            return ['success' => false, 'error' => 'No UID available'];
-        }
-
-        $url = $this->baseUrl . '/xmlrpc/2/object';
-        
-        // Search for quotes with limit
+        // Test search for sale.order records
         $xmlRequest = '<?xml version="1.0"?>
 <methodCall>
-    <methodName>execute_kw</methodName>
-    <params>
-        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><int>' . $this->uid . '</int></value></param>
-        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
-        <param><value><string>sale.order</string></value></param>
-        <param><value><string>search</string></value></param>
-        <param><value><array><data>
-            <value><array><data></data></array></value>
-            <value><struct>
-                <member><name>limit</name><value><int>5</int></value></member>
-            </struct></value>
-        </data></array></value></param>
-    </params>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>search_count</string></value>
+      </param>
+      <param>
+         <value><array><data/></array></value>
+      </param>
+   </params>
 </methodCall>';
 
-        $response = $this->makeCurlRequest($url, $xmlRequest);
+        $response = $this->makeCurlRequest($this->url, $xmlRequest);
         
         if ($response === false) {
             return ['success' => false, 'error' => 'No response from quote search'];
@@ -307,70 +227,11 @@ class OdooHelper
             return ['success' => false, 'error' => 'Invalid search response'];
         }
 
-        return ['success' => true, 'quotes' => is_array($result) ? $result : []];
+        return ['success' => true, 'quotes' => is_numeric($result) ? (int)$result : 0];
     }
 
     /**
-     * Authenticate with Odoo and get UID
-     *
-     * @return  boolean  True if authentication successful
-     */
-    private function authenticate()
-    {
-        if ($this->uid !== null) {
-            return true; // Already authenticated
-        }
-
-        try {
-            $url = $this->baseUrl . '/xmlrpc/2/common';
-            
-            $xmlRequest = '<?xml version="1.0"?>
-<methodCall>
-    <methodName>authenticate</methodName>
-    <params>
-        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($this->username) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
-        <param><value><struct></struct></value></param>
-    </params>
-</methodCall>';
-
-            $response = $this->makeCurlRequest($url, $xmlRequest);
-            
-            if ($response === false) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Authentication failed: No response from server', 'error');
-                }
-                return false;
-            }
-
-            $result = $this->parseXmlResponse($response);
-            
-            if ($result === false || !is_numeric($result)) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Authentication failed: Invalid response - ' . print_r($result, true), 'error');
-                }
-                return false;
-            }
-
-            $this->uid = (int) $result;
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Authentication successful. UID: ' . $this->uid, 'info');
-            }
-            
-            return true;
-
-        } catch (Exception $e) {
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Authentication error: ' . $e->getMessage(), 'error');
-            }
-            return false;
-        }
-    }
-
-    /**
-     * Make cURL request to Odoo
+     * Make cURL request to Odoo using the exact working format
      *
      * @param   string  $url     The URL to call
      * @param   string  $xmlData The XML data to send
@@ -418,44 +279,102 @@ class OdooHelper
     }
 
     /**
-     * Make XML-RPC call to Odoo
+     * Make Odoo call using the exact working XML-RPC format
      *
      * @param   string  $model   The Odoo model
      * @param   string  $method  The method to call
-     * @param   array   $args    Arguments for the method
+     * @param   array   $domain  Domain filters
+     * @param   array   $fields  Fields to retrieve
+     * @param   array   $options Additional options (limit, offset, order)
      *
      * @return  mixed   The result or false on error
      */
-    private function odooCall($model, $method, $args = [])
+    private function odooCall($model, $method, $domain = [], $fields = [], $options = [])
     {
-        if (!$this->authenticate()) {
-            return false;
-        }
-
         try {
-            $url = $this->baseUrl . '/xmlrpc/2/object';
-            
             $xmlRequest = '<?xml version="1.0"?>
 <methodCall>
-    <methodName>execute_kw</methodName>
-    <params>
-        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
-        <param><value><int>' . $this->uid . '</int></value></param>
-        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($model) . '</string></value></param>
-        <param><value><string>' . htmlspecialchars($method) . '</string></value></param>
-        <param><value><array><data>';
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($model) . '</string></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($method) . '</string></value>
+      </param>
+      <param>
+         <value><array><data>';
 
-            // Add arguments
-            foreach ($args as $arg) {
-                $xmlRequest .= '<value>' . $this->encodeValue($arg) . '</value>';
+            // Add domain as first argument
+            if (!empty($domain)) {
+                $xmlRequest .= '<value>' . $this->encodeDomain($domain) . '</value>';
+            } else {
+                $xmlRequest .= '<value><array><data/></array></value>';
             }
 
-            $xmlRequest .= '</data></array></value></param>
-    </params>
+            $xmlRequest .= '</data></array></value>
+      </param>';
+
+            // Add keyword arguments if we have fields or options
+            if (!empty($fields) || !empty($options)) {
+                $xmlRequest .= '
+      <param>
+         <value>
+            <struct>';
+
+                // Add fields
+                if (!empty($fields)) {
+                    $xmlRequest .= '
+               <member>
+                  <name>fields</name>
+                  <value>
+                     <array>
+                        <data>';
+                    foreach ($fields as $field) {
+                        $xmlRequest .= '<value><string>' . htmlspecialchars($field) . '</string></value>';
+                    }
+                    $xmlRequest .= '
+                        </data>
+                     </array>
+                  </value>
+               </member>';
+                }
+
+                // Add options (limit, offset, order)
+                foreach ($options as $key => $value) {
+                    $xmlRequest .= '
+               <member>
+                  <name>' . htmlspecialchars($key) . '</name>
+                  <value>';
+                    if (is_int($value)) {
+                        $xmlRequest .= '<int>' . $value . '</int>';
+                    } else {
+                        $xmlRequest .= '<string>' . htmlspecialchars($value) . '</string>';
+                    }
+                    $xmlRequest .= '</value>
+               </member>';
+                }
+
+                $xmlRequest .= '
+            </struct>
+         </value>
+      </param>';
+            }
+
+            $xmlRequest .= '
+   </params>
 </methodCall>';
 
-            $response = $this->makeCurlRequest($url, $xmlRequest);
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
             
             if ($response === false) {
                 return false;
@@ -463,7 +382,7 @@ class OdooHelper
 
             $result = $this->parseXmlResponse($response);
             
-            if ($this->debug && $method === 'search') {
+            if ($this->debug && $method === 'search_read') {
                 Factory::getApplication()->enqueueMessage('Odoo call result for ' . $model . '.' . $method . ': ' . print_r($result, true), 'info');
             }
             
@@ -478,46 +397,32 @@ class OdooHelper
     }
 
     /**
-     * Encode a value for XML-RPC
+     * Encode domain filters for XML-RPC
      *
-     * @param   mixed  $value  The value to encode
+     * @param   array  $domain  Domain filters
      *
-     * @return  string  The encoded XML
+     * @return  string  Encoded XML
      */
-    private function encodeValue($value)
+    private function encodeDomain($domain)
     {
-        if (is_array($value)) {
-            if (empty($value)) {
-                return '<array><data></data></array>';
-            }
-            
-            // Check if it's an associative array (struct) or indexed array
-            if (array_keys($value) !== range(0, count($value) - 1)) {
-                // Associative array - encode as struct
-                $xml = '<struct>';
-                foreach ($value as $key => $val) {
-                    $xml .= '<member><name>' . htmlspecialchars($key) . '</name><value>' . $this->encodeValue($val) . '</value></member>';
+        $xml = '<array><data>';
+        
+        foreach ($domain as $condition) {
+            if (is_array($condition) && count($condition) === 3) {
+                $xml .= '<value><array><data>';
+                $xml .= '<value><string>' . htmlspecialchars($condition[0]) . '</string></value>';
+                $xml .= '<value><string>' . htmlspecialchars($condition[1]) . '</string></value>';
+                if (is_int($condition[2])) {
+                    $xml .= '<value><int>' . $condition[2] . '</int></value>';
+                } else {
+                    $xml .= '<value><string>' . htmlspecialchars($condition[2]) . '</string></value>';
                 }
-                $xml .= '</struct>';
-                return $xml;
-            } else {
-                // Indexed array
-                $xml = '<array><data>';
-                foreach ($value as $val) {
-                    $xml .= '<value>' . $this->encodeValue($val) . '</value>';
-                }
-                $xml .= '</data></array>';
-                return $xml;
+                $xml .= '</data></array></value>';
             }
-        } elseif (is_int($value)) {
-            return '<int>' . $value . '</int>';
-        } elseif (is_float($value)) {
-            return '<double>' . $value . '</double>';
-        } elseif (is_bool($value)) {
-            return '<boolean>' . ($value ? '1' : '0') . '</boolean>';
-        } else {
-            return '<string>' . htmlspecialchars((string)$value) . '</string>';
         }
+        
+        $xml .= '</data></array>';
+        return $xml;
     }
 
     /**
@@ -619,7 +524,7 @@ class OdooHelper
     }
 
     /**
-     * Get quotes by sales agent
+     * Get quotes by sales agent using the working XML-RPC format
      *
      * @param   string   $agentName  The sales agent name
      * @param   integer  $page       Page number
@@ -644,21 +549,11 @@ class OdooHelper
             // Calculate offset
             $offset = ($page - 1) * $limit;
 
-            // Get quote IDs first
-            $quoteIds = $this->odooCall('sale.order', 'search', [
-                $domain,
+            // Use search_read method like in the working Postman example
+            $quotes = $this->odooCall('sale.order', 'search_read', $domain, 
+                ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note'],
                 ['offset' => $offset, 'limit' => $limit, 'order' => 'date_order desc']
-            ]);
-
-            if (!$quoteIds || !is_array($quoteIds)) {
-                return $this->getMockQuotes($search);
-            }
-
-            // Get quote details
-            $quotes = $this->odooCall('sale.order', 'read', [
-                $quoteIds,
-                ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note']
-            ]);
+            );
 
             if (!$quotes || !is_array($quotes)) {
                 return $this->getMockQuotes($search);
@@ -702,10 +597,10 @@ class OdooHelper
     public function getQuote($quoteId)
     {
         try {
-            $quotes = $this->odooCall('sale.order', 'read', [
-                [$quoteId],
+            $quotes = $this->odooCall('sale.order', 'search_read', 
+                [['id', '=', $quoteId]],
                 ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note']
-            ]);
+            );
 
             if (!$quotes || !is_array($quotes) || empty($quotes)) {
                 return false;
@@ -749,10 +644,56 @@ class OdooHelper
                 'x_studio_agente_de_ventas_1' => $data['x_studio_agente_de_ventas_1']
             ];
 
-            $quoteId = $this->odooCall('sale.order', 'create', [$quoteData]);
+            // Use create method
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>create</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><struct>';
 
-            if ($quoteId && is_numeric($quoteId)) {
-                return (int) $quoteId;
+            foreach ($quoteData as $key => $value) {
+                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
+                if (is_int($value)) {
+                    $xmlRequest .= '<value><int>' . $value . '</int></value>';
+                } else {
+                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
+                }
+                $xmlRequest .= '</member>';
+            }
+
+            $xmlRequest .= '</struct></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+
+            if ($result && is_numeric($result)) {
+                return (int) $result;
             }
 
             return false;
@@ -794,7 +735,56 @@ class OdooHelper
                 return true; // Nothing to update
             }
 
-            $result = $this->odooCall('sale.order', 'write', [[$quoteId], $updateData]);
+            // Use write method
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>write</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><array><data>
+               <value><int>' . $quoteId . '</int></value>
+            </data></array></value>
+            <value><struct>';
+
+            foreach ($updateData as $key => $value) {
+                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
+                if (is_int($value)) {
+                    $xmlRequest .= '<value><int>' . $value . '</int></value>';
+                } else {
+                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
+                }
+                $xmlRequest .= '</member>';
+            }
+
+            $xmlRequest .= '</struct></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
 
             return $result === true;
 
@@ -816,7 +806,42 @@ class OdooHelper
     public function deleteQuote($quoteId)
     {
         try {
-            $result = $this->odooCall('sale.order', 'unlink', [[$quoteId]]);
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order</string></value>
+      </param>
+      <param>
+         <value><string>unlink</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><array><data>
+               <value><int>' . $quoteId . '</int></value>
+            </data></array></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
             return $result === true;
 
         } catch (Exception $e) {
@@ -876,7 +901,8 @@ class OdooHelper
      */
     public function testConnection()
     {
-        return $this->authenticate();
+        $test = $this->testOdooApiCall();
+        return $test['success'];
     }
 
     /**
@@ -887,35 +913,25 @@ class OdooHelper
     public function getConnectionStatus()
     {
         $status = [
-            'base_url' => $this->baseUrl,
+            'url' => $this->url,
             'database' => $this->database,
-            'username' => $this->username,
-            'password_set' => !empty($this->password),
+            'user_id' => $this->userId,
+            'api_key_set' => !empty($this->apiKey),
             'curl_available' => function_exists('curl_init'),
             'connection_test' => false,
             'authentication_test' => false,
-            'uid' => null,
+            'uid' => $this->userId,
             'error_message' => ''
         ];
 
         try {
-            // Test basic cURL functionality
-            $ch = curl_init();
-            if (!$ch) {
-                $status['error_message'] = 'cURL initialization failed';
-                return $status;
-            }
-            curl_close($ch);
-
-            // Test authentication
-            $authResult = $this->authenticate();
-            $status['authentication_test'] = $authResult;
-            $status['uid'] = $this->uid;
+            // Test the API call
+            $apiTest = $this->testOdooApiCall();
+            $status['connection_test'] = $apiTest['success'];
+            $status['authentication_test'] = $apiTest['success'];
             
-            if ($authResult) {
-                $status['connection_test'] = true;
-            } else {
-                $status['error_message'] = 'Authentication failed - check username/password';
+            if (!$apiTest['success']) {
+                $status['error_message'] = $apiTest['error'];
             }
 
         } catch (Exception $e) {
