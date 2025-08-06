@@ -86,7 +86,8 @@ $user = Factory::getUser();
                                         </label>
                                         <input type="date" name="jform[date_order]" id="jform_date_order" 
                                                value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
-                                               class="form-control required" required />
+                                               class="form-control required" required 
+                                               <?php echo ($isNew) ? '' : ''; ?> />
                                     </div>
                                 </div>
                             </div>
@@ -139,7 +140,8 @@ $user = Factory::getUser();
                                             Notas
                                         </label>
                                         <textarea name="jform[note]" id="jform_note" 
-                                                 class="form-control" rows="4"><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
+                                                 class="form-control" rows="4" 
+                                                 <?php echo ($isNew) ? '' : ''; ?>><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -281,10 +283,10 @@ $user = Factory::getUser();
                                                 <td class="currency-amount">Q <?php echo number_format($subtotal, 2); ?></td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea" id="edit-btn-<?php echo $line['id']; ?>" data-line-id="<?php echo $line['id']; ?>">
+                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea" id="delete-btn-<?php echo $line['id']; ?>" data-line-id="<?php echo $line['id']; ?>">
+                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </div>
@@ -334,6 +336,9 @@ $user = Factory::getUser();
                             <button type="button" class="btn btn-success btn-lg" onclick="saveQuote()">
                                 <i class="fas fa-save"></i> Guardar Cambios
                             </button>
+                           <button type="button" class="btn btn-info" onclick="window.location.reload()">
+                               <i class="fas fa-sync-alt"></i> Actualizar
+                           </button>
                         <?php endif; ?>
                     </div>
                     <div class="btn-group" role="group">
@@ -635,13 +640,16 @@ function editQuoteLine(lineId) {
         return;
     }
     
-    console.log('Found row:', row);
-    
     // Get original data from row attributes
     const originalDescription = row.getAttribute('data-original-description') || '';
     const originalQuantity = parseFloat(row.getAttribute('data-original-quantity')) || 1;
     const originalPrice = parseFloat(row.getAttribute('data-original-price')) || 0;
-    const productName = row.querySelector('strong').textContent || 'Producto';
+    
+    // Get product name from the first cell
+    const firstCell = row.cells[0];
+    const productName = firstCell.querySelector('strong') ? firstCell.querySelector('strong').textContent : 'Producto';
+    
+    console.log('Edit data:', {lineId, originalDescription, originalQuantity, originalPrice, productName});
     
     // Store original content for cancel
     if (!row.hasAttribute('data-original-content')) {
@@ -701,6 +709,8 @@ function saveQuoteLineEdit(lineId) {
     const quantity = parseFloat(document.getElementById(`edit-quantity-${lineId}`).value) || 1;
     const price = parseFloat(document.getElementById(`edit-price-${lineId}`).value) || 0;
     
+    console.log('Save data:', {lineId, description, quantity, price});
+    
     // Validation
     if (!description || quantity <= 0 || price <= 0) {
         alert('Por favor complete todos los campos correctamente');
@@ -708,11 +718,14 @@ function saveQuoteLineEdit(lineId) {
     }
     
     // Show loading state
-    const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
+    const saveBtn = event.target;
     if (saveBtn) {
         const originalText = saveBtn.innerHTML;
         saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         saveBtn.disabled = true;
+        
+        // Store original state for restoration
+        saveBtn.setAttribute('data-original-text', originalText);
     }
     
     // Update in Odoo
@@ -754,11 +767,23 @@ function updateQuoteLineInOdoo(lineId, description, quantity, price) {
             }, 1000);
         } else {
             alert('Error al actualizar la línea en Odoo: ' + data.message);
+            // Restore button state on error
+            const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
+            if (saveBtn && saveBtn.hasAttribute('data-original-text')) {
+                saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+                saveBtn.disabled = false;
+            }
         }
     })
     .catch(error => {
         console.error('Error updating line:', error);
         alert('Error de conexión al actualizar la línea');
+        // Restore button state on error
+        const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
+        if (saveBtn && saveBtn.hasAttribute('data-original-text')) {
+            saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
+            saveBtn.disabled = false;
+        }
     });
 }
 
@@ -769,11 +794,14 @@ function removeQuoteLine(lineId) {
         console.log('User confirmed deletion');
         
         // Show loading state
-        const deleteBtn = document.getElementById(`delete-btn-${lineId}`);
+        const deleteBtn = event.target.closest('button');
         if (deleteBtn) {
             const originalText = deleteBtn.innerHTML;
             deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
             deleteBtn.disabled = true;
+            
+            // Store original state for restoration
+            deleteBtn.setAttribute('data-original-text', originalText);
         }
         
         // Delete from Odoo
@@ -803,11 +831,23 @@ function deleteQuoteLineFromOdoo(lineId) {
             }, 1000);
         } else {
             alert('Error al eliminar la línea de Odoo: ' + data.message);
+            // Restore button state on error
+            const deleteBtn = document.querySelector(`button[onclick="removeQuoteLine(${lineId})"]`);
+            if (deleteBtn && deleteBtn.hasAttribute('data-original-text')) {
+                deleteBtn.innerHTML = deleteBtn.getAttribute('data-original-text');
+                deleteBtn.disabled = false;
+            }
         }
     })
     .catch(error => {
         console.error('Error deleting line:', error);
         alert('Error de conexión al eliminar la línea');
+        // Restore button state on error
+        const deleteBtn = document.querySelector(`button[onclick="removeQuoteLine(${lineId})"]`);
+        if (deleteBtn && deleteBtn.hasAttribute('data-original-text')) {
+            deleteBtn.innerHTML = deleteBtn.getAttribute('data-original-text');
+            deleteBtn.disabled = false;
+        }
     });
 }
 
