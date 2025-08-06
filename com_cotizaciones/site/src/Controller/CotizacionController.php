@@ -129,130 +129,95 @@ class CotizacionController extends FormController
     }
 
     /**
-     * Search clients via AJAX
+     * Add a new quote line
      *
-     * @return  void
+     * @return  boolean  True if successful, false otherwise.
      */
-    public function searchClients()
+    public function addLine()
     {
-        $app = Factory::getApplication();
-        $input = $app->input;
-        
-        // Set JSON response
-        $app->getDocument()->setMimeEncoding('application/json');
-        
-        $search = $input->getString('search', '');
-        
-        if (empty($search) || strlen($search) < 2) {
-            echo json_encode(['clients' => []]);
-            $app->close();
+        // Check for request forgeries
+        if (!Session::checkToken()) {
+            $this->app->enqueueMessage(Text::_('JINVALID_TOKEN'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
+            return false;
         }
-        
-        try {
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            $clients = $helper->getClients($search);
-            
-            echo json_encode(['clients' => $clients]);
-        } catch (Exception $e) {
-            echo json_encode(['clients' => [], 'error' => $e->getMessage()]);
-        }
-        
-        $app->close();
-    }
 
-    /**
-     * Create quote line via AJAX
-     *
-     * @return  void
-     */
-    public function createLine()
-    {
-        $app = Factory::getApplication();
-        $input = $app->input;
+        $user = Factory::getUser();
         
-        // Set JSON response
-        $app->getDocument()->setMimeEncoding('application/json');
+        if ($user->guest) {
+            $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_LOGIN_REQUIRED'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_users&view=login'));
+            return false;
+        }
+
+        $quoteId = $this->input->getInt('quote_id');
+        $description = $this->input->getString('line_description');
+        $quantity = $this->input->getFloat('line_quantity');
+        $price = $this->input->getFloat('line_price');
         
-        $quoteId = $input->getInt('quote_id');
-        $productName = $input->getString('product_name');
-        $description = $input->getString('description');
-        $quantity = $input->getFloat('quantity');
-        $price = $input->getFloat('price');
-        
-        if (!$quoteId || !$productName || !$description || !$quantity || !$price) {
-            echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
-            $app->close();
+        if (!$quoteId || !$description || !$quantity || !$price) {
+            $this->app->enqueueMessage('Todos los campos son requeridos', 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+            return false;
         }
         
         try {
             $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            
+            // Generate product name (incremental)
+            $model = $this->getModel('Cotizacion');
+            $quote = $model->getItem($quoteId);
+            $existingLines = $model->getQuoteLines($quoteId);
+            $lineNumber = count($existingLines) + 1;
+            $productName = $quote->name . '-' . str_pad($lineNumber, 2, '0', STR_PAD_LEFT);
+            
             $lineId = $helper->createQuoteLine($quoteId, $productName, $description, $quantity, $price);
             
             if ($lineId) {
-                echo json_encode(['success' => true, 'line_id' => $lineId]);
+                $this->app->enqueueMessage('Línea agregada exitosamente', 'success');
             } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to create quote line']);
+                $this->app->enqueueMessage('Error al agregar la línea', 'error');
             }
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            $this->app->enqueueMessage('Error: ' . $e->getMessage(), 'error');
         }
         
-        $app->close();
+        $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+        return true;
     }
 
     /**
-     * Get quote lines via AJAX
+     * Update a quote line
      *
-     * @return  void
-     */
-    public function getLines()
-    {
-        $app = Factory::getApplication();
-        $input = $app->input;
-        
-        // Set JSON response
-        $app->getDocument()->setMimeEncoding('application/json');
-        
-        $quoteId = $input->getInt('quote_id');
-        
-        if (!$quoteId) {
-            echo json_encode(['success' => false, 'message' => 'Missing quote ID']);
-            $app->close();
-        }
-        
-        try {
-            $model = $this->getModel('Cotizacion');
-            $lines = $model->getQuoteLines($quoteId);
-            
-            echo json_encode(['success' => true, 'lines' => $lines]);
-        } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        }
-        
-        $app->close();
-    }
-
-    /**
-     * Update quote line via AJAX
-     *
-     * @return  void
+     * @return  boolean  True if successful, false otherwise.
      */
     public function updateLine()
     {
-        $app = Factory::getApplication();
-        $input = $app->input;
+        // Check for request forgeries
+        if (!Session::checkToken()) {
+            $this->app->enqueueMessage(Text::_('JINVALID_TOKEN'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
+            return false;
+        }
+
+        $user = Factory::getUser();
         
-        // Set JSON response
-        $app->getDocument()->setMimeEncoding('application/json');
-        
-        $lineId = $input->getInt('line_id');
-        $description = $input->getString('description');
-        $quantity = $input->getFloat('quantity');
-        $price = $input->getFloat('price');
+        if ($user->guest) {
+            $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_LOGIN_REQUIRED'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_users&view=login'));
+            return false;
+        }
+
+        $lineId = $this->input->getInt('line_id');
+        $description = $this->input->getString('edit_description');
+        $quantity = $this->input->getFloat('edit_quantity');
+        $price = $this->input->getFloat('edit_price');
+        $quoteId = $this->input->getInt('id');
         
         if (!$lineId || !$description || !$quantity || !$price) {
-            echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
-            $app->close();
+            $this->app->enqueueMessage('Todos los campos son requeridos', 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+            return false;
         }
         
         try {
@@ -260,35 +225,47 @@ class CotizacionController extends FormController
             $result = $helper->updateQuoteLine($lineId, $description, $quantity, $price);
             
             if ($result) {
-                echo json_encode(['success' => true]);
+                $this->app->enqueueMessage('Línea actualizada exitosamente', 'success');
             } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to update quote line']);
+                $this->app->enqueueMessage('Error al actualizar la línea', 'error');
             }
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            $this->app->enqueueMessage('Error: ' . $e->getMessage(), 'error');
         }
         
-        $app->close();
+        $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+        return true;
     }
 
     /**
-     * Delete quote line via AJAX
+     * Delete a quote line
      *
-     * @return  void
+     * @return  boolean  True if successful, false otherwise.
      */
     public function deleteLine()
     {
-        $app = Factory::getApplication();
-        $input = $app->input;
+        // Check for request forgeries
+        if (!Session::checkToken()) {
+            $this->app->enqueueMessage(Text::_('JINVALID_TOKEN'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
+            return false;
+        }
+
+        $user = Factory::getUser();
         
-        // Set JSON response
-        $app->getDocument()->setMimeEncoding('application/json');
-        
-        $lineId = $input->getInt('line_id');
+        if ($user->guest) {
+            $this->app->enqueueMessage(Text::_('COM_COTIZACIONES_ERROR_LOGIN_REQUIRED'), 'error');
+            $this->setRedirect(Route::_('index.php?option=com_users&view=login'));
+            return false;
+        }
+
+        $lineId = $this->input->getInt('line_id');
+        $quoteId = $this->input->getInt('id');
         
         if (!$lineId) {
-            echo json_encode(['success' => false, 'message' => 'Missing line ID']);
-            $app->close();
+            $this->app->enqueueMessage('ID de línea requerido', 'error');
+            $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+            return false;
         }
         
         try {
@@ -296,15 +273,16 @@ class CotizacionController extends FormController
             $result = $helper->deleteQuoteLine($lineId);
             
             if ($result) {
-                echo json_encode(['success' => true]);
+                $this->app->enqueueMessage('Línea eliminada exitosamente', 'success');
             } else {
-                echo json_encode(['success' => false, 'message' => 'Failed to delete quote line']);
+                $this->app->enqueueMessage('Error al eliminar la línea', 'error');
             }
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            $this->app->enqueueMessage('Error: ' . $e->getMessage(), 'error');
         }
         
-        $app->close();
+        $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
+        return true;
     }
 
     /**

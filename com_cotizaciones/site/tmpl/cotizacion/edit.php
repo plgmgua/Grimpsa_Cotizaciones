@@ -20,6 +20,10 @@ HTMLHelper::_('behavior.formvalidator');
 
 $isNew = (!isset($this->item->id) || (int)$this->item->id === 0);
 $user = Factory::getUser();
+
+// Get current action from URL
+$currentTask = Factory::getApplication()->input->get('task', '');
+$editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
 ?>
 
 <div class="cotizaciones-component">
@@ -49,8 +53,9 @@ $user = Factory::getUser();
         </div>
     </div>
 
+    <!-- Quote Header Form -->
     <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int) ($this->item->id ?? 0)); ?>" 
-          method="post" name="adminForm" id="adminForm" class="form-validate">
+          method="post" name="quoteForm" id="quoteForm" class="form-validate">
         
         <div class="quote-form-container">
             <div class="row">
@@ -86,8 +91,7 @@ $user = Factory::getUser();
                                         </label>
                                         <input type="date" name="jform[date_order]" id="jform_date_order" 
                                                value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
-                                               class="form-control required" required 
-                                               <?php echo ($isNew) ? '' : ''; ?> />
+                                               class="form-control required" required />
                                     </div>
                                 </div>
                             </div>
@@ -99,25 +103,24 @@ $user = Factory::getUser();
                                             <label for="client_search" class="form-label">
                                                 Cliente *
                                             </label>
-                                            <div class="client-selector">
-                                                <input type="text" id="client_search" 
-                                                       class="form-control" 
-                                                       placeholder="Buscar cliente por nombre..." 
-                                                       autocomplete="off" />
-                                                <div id="client_results" class="client-results" style="display: none;"></div>
-                                                <input type="hidden" name="jform[partner_id]" id="jform_partner_id" 
-                                                       value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" 
-                                                       class="required" required />
-                                                <div id="selected_client" class="selected-client" style="display: none;">
-                                                    <div class="alert alert-success">
-                                                        <strong>Cliente seleccionado:</strong> <span id="selected_client_name"></span>
-                                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearClientSelection()">
-                                                            <i class="fas fa-times"></i> Cambiar
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <small class="form-text text-muted">Busque y seleccione un cliente existente</small>
+                                            <select name="jform[partner_id]" id="jform_partner_id" class="form-select required" required>
+                                                <option value="">Seleccionar Cliente...</option>
+                                                <?php
+                                                // Load clients from Odoo
+                                                try {
+                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+                                                    $clients = $helper->getClients();
+                                                    foreach ($clients as $client) {
+                                                        $selected = (isset($this->item->partner_id) && $this->item->partner_id == $client['id']) ? 'selected' : '';
+                                                        echo '<option value="' . (int)$client['id'] . '" ' . $selected . '>' . 
+                                                             htmlspecialchars($client['name']) . '</option>';
+                                                    }
+                                                } catch (Exception $e) {
+                                                    echo '<option value="">Error cargando clientes</option>';
+                                                }
+                                                ?>
+                                            </select>
+                                            <small class="form-text text-muted">Seleccione un cliente existente</small>
                                         <?php else: ?>
                                             <label for="jform_client_name" class="form-label">
                                                 Cliente
@@ -140,26 +143,30 @@ $user = Factory::getUser();
                                             Notas
                                         </label>
                                         <textarea name="jform[note]" id="jform_note" 
-                                                 class="form-control" rows="4" 
-                                                 <?php echo ($isNew) ? '' : ''; ?>><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
+                                                 class="form-control" rows="4"><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Header Save Actions for Existing Quotes -->
-                        <?php if (!empty($this->item->id) && $this->item->id > 0): ?>
+                        <!-- Header Save Actions -->
                         <div class="card-footer bg-light">
                             <div class="btn-group" role="group">
-                                <button type="button" class="btn btn-success" onclick="saveQuote()">
-                                    <i class="fas fa-save"></i> Guardar Información Básica
-                                </button>
-                                <button type="button" class="btn btn-info" onclick="window.location.reload()">
-                                    <i class="fas fa-sync-alt"></i> Actualizar
-                                </button>
+                                <?php if ($isNew): ?>
+                                    <button type="submit" name="task" value="cotizacion.save" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Crear Cotización
+                                    </button>
+                                <?php else: ?>
+                                    <button type="submit" name="task" value="cotizacion.save" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Guardar Información Básica
+                                    </button>
+                                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                                       class="btn btn-info">
+                                        <i class="fas fa-sync-alt"></i> Actualizar
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -196,98 +203,149 @@ $user = Factory::getUser();
                 </div>
             </div>
 
-            <!-- Quote Lines Section - Only show if quote has been created -->
-            <?php if (!empty($this->item->id) && $this->item->id > 0 && !empty($this->item->name)): ?>
-    <?php
-    // Load existing quote lines
-    $model = $this->getModel();
-    $existingLines = $model->getQuoteLines($this->item->id);
-    ?>
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-list"></i> Líneas de Cotización
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <!-- Add Product Line Form -->
-                            <div class="add-line-form">
-                                <div class="card border-success">
-                                    <div class="card-header bg-light">
-                                        <h6 class="mb-0">
-                                            <i class="fas fa-plus"></i> Agregar Producto
-                                        </h6>
+            <!-- Hidden fields -->
+            <input type="hidden" name="id" value="<?php echo (int) ($this->item->id ?? 0); ?>" />
+            <?php echo HTMLHelper::_('form.token'); ?>
+        </div>
+    </form>
+
+    <!-- Quote Lines Section - Only show if quote has been created -->
+    <?php if (!empty($this->item->id) && $this->item->id > 0 && !empty($this->item->name)): ?>
+        <?php
+        // Load existing quote lines
+        $model = $this->getModel();
+        $existingLines = $model->getQuoteLines($this->item->id);
+        ?>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list"></i> Líneas de Cotización
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        
+                        <!-- Add Product Line Form -->
+                        <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                              method="post" class="add-line-form">
+                            <div class="card border-success">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-plus"></i> Agregar Producto
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="line_description" class="form-label">Descripción del Producto *</label>
+                                                <textarea name="line_description" id="line_description" class="form-control" rows="3" 
+                                                          placeholder="Descripción detallada del producto o servicio..." required></textarea>
+                                                <small class="form-text text-muted">
+                                                    Incluye especificaciones, materiales, dimensiones, etc.
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label for="line_quantity" class="form-label">Cantidad *</label>
+                                                <input type="number" name="line_quantity" id="line_quantity" class="form-control" 
+                                                       value="1" min="1" step="1" required />
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label for="line_price" class="form-label">Precio Unitario *</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">Q</span>
+                                                    <input type="number" name="line_price" id="line_price" class="form-control" 
+                                                           step="0.01" min="0" placeholder="0.00" required />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="product_description" class="form-label">Descripción del Producto *</label>
-                                                    <textarea id="product_description" class="form-control" rows="3" 
-                                                              placeholder="Descripción detallada del producto o servicio..." required></textarea>
-                                                    <small class="form-text text-muted">
-                                                        Incluye especificaciones, materiales, dimensiones, etc.
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="mb-3">
-                                                    <label for="product_quantity" class="form-label">Cantidad *</label>
-                                                    <input type="number" id="product_quantity" class="form-control" 
-                                                           value="1" min="1" step="1" required />
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="mb-3">
-                                                    <label for="product_price" class="form-label">Precio Unitario *</label>
-                                                    <div class="input-group">
-                                                        <span class="input-group-text">Q</span>
-                                                        <input type="number" id="product_price" class="form-control" 
-                                                               step="0.01" min="0" placeholder="0.00" required />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="text-end">
-                                            <button type="button" class="btn btn-success" onclick="addQuoteLine()">
-                                                <i class="fas fa-plus"></i> Agregar Línea
-                                            </button>
-                                        </div>
+                                    <div class="text-end">
+                                        <button type="submit" name="task" value="cotizacion.addLine" class="btn btn-success">
+                                            <i class="fas fa-plus"></i> Agregar Línea
+                                        </button>
                                     </div>
                                 </div>
                             </div>
+                            <input type="hidden" name="quote_id" value="<?php echo (int)$this->item->id; ?>" />
+                            <?php echo HTMLHelper::_('form.token'); ?>
+                        </form>
 
-                            <!-- Quote Lines Table -->
-                            <div class="quote-lines-table mt-4">
-                                <table class="table table-striped" id="quote-lines-table">
-                                    <thead class="table-success">
+                        <!-- Quote Lines Table -->
+                        <div class="quote-lines-table mt-4">
+                            <table class="table table-striped">
+                                <thead class="table-success">
+                                    <tr>
+                                        <th width="35%">Producto</th>
+                                        <th width="15%">Cantidad</th>
+                                        <th width="15%">Precio Unit.</th>
+                                        <th width="15%">Subtotal</th>
+                                        <th width="20%">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($existingLines)): ?>
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">
+                                            <i class="fas fa-info-circle"></i> 
+                                            No hay líneas agregadas. Use el formulario de arriba para agregar productos.
+                                        </td>
+                                    </tr>
+                                    <?php else: ?>
+                                        <?php 
+                                        $total = 0;
+                                        foreach ($existingLines as $line): 
+                                            $subtotal = $line['product_uom_qty'] * $line['price_unit'];
+                                            $total += $subtotal;
+                                            
+                                            // Check if this line is being edited
+                                            $isEditing = ($editLineId == $line['id']);
+                                        ?>
                                         <tr>
-                                            <th width="35%">Producto</th>
-                                            <th width="15%">Cantidad</th>
-                                            <th width="15%">Precio Unit.</th>
-                                            <th width="15%">Subtotal</th>
-                                            <th width="20%">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="quote-lines-tbody">
-                                        <!-- Quote lines will be loaded here -->
-                                        <?php if (empty($existingLines)): ?>
-                                        <tr id="no-lines-row">
-                                            <td colspan="5" class="text-center text-muted">
-                                                <i class="fas fa-info-circle"></i> 
-                                                No hay líneas agregadas. Use el formulario de arriba para agregar productos.
-                                            </td>
-                                        </tr>
-                                        <?php else: ?>
-                                            <?php 
-                                            $total = 0;
-                                            foreach ($existingLines as $i => $line): 
-                                                $subtotal = $line['product_uom_qty'] * $line['price_unit'];
-                                                $total += $subtotal;
-                                            ?>
-                                            <tr data-line-id="<?php echo $line['id']; ?>" data-odoo-id="<?php echo $line['id']; ?>" id="line-row-<?php echo $line['id']; ?>" data-original-description="<?php echo htmlspecialchars($line['name']); ?>" data-original-quantity="<?php echo $line['product_uom_qty']; ?>" data-original-price="<?php echo $line['price_unit']; ?>">
+                                            <?php if ($isEditing): ?>
+                                                <!-- Edit Mode -->
+                                                <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                                                      method="post" style="display: contents;">
+                                                    <td>
+                                                        <strong><?php echo htmlspecialchars($line['product_name']); ?></strong>
+                                                        <br>
+                                                        <textarea name="edit_description" class="form-control form-control-sm" rows="2" 
+                                                                  required><?php echo htmlspecialchars($line['name']); ?></textarea>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" name="edit_quantity" class="form-control form-control-sm" 
+                                                               value="<?php echo $line['product_uom_qty']; ?>" min="1" step="1" required />
+                                                    </td>
+                                                    <td>
+                                                        <div class="input-group input-group-sm">
+                                                            <span class="input-group-text">Q</span>
+                                                            <input type="number" name="edit_price" class="form-control" 
+                                                                   value="<?php echo $line['price_unit']; ?>" step="0.01" min="0" required />
+                                                        </div>
+                                                    </td>
+                                                    <td class="currency-amount">Q <?php echo number_format($subtotal, 2); ?></td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm">
+                                                            <button type="submit" name="task" value="cotizacion.updateLine" class="btn btn-success" title="Guardar cambios">
+                                                                <i class="fas fa-save"></i>
+                                                            </button>
+                                                            <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                                                               class="btn btn-secondary" title="Cancelar">
+                                                                <i class="fas fa-times"></i>
+                                                            </a>
+                                                        </div>
+                                                    </td>
+                                                    <input type="hidden" name="line_id" value="<?php echo $line['id']; ?>" />
+                                                    <?php echo HTMLHelper::_('form.token'); ?>
+                                                </form>
+                                            <?php else: ?>
+                                                <!-- View Mode -->
                                                 <td>
                                                     <strong><?php echo htmlspecialchars($line['product_name']); ?></strong>
                                                     <br><small class="text-muted"><?php echo htmlspecialchars($line['name']); ?></small>
@@ -297,668 +355,64 @@ $user = Factory::getUser();
                                                 <td class="currency-amount">Q <?php echo number_format($subtotal, 2); ?></td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea" data-line-id="<?php echo $line['id']; ?>">
+                                                        <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id . '&edit_line_id=' . $line['id']); ?>" 
+                                                           class="btn btn-outline-primary" title="Editar línea">
                                                             <i class="fas fa-edit"></i>
-                                                        </button>
-                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea" data-line-id="<?php echo $line['id']; ?>">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
+                                                        </a>
+                                                        <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                                                              method="post" style="display: inline;" 
+                                                              onsubmit="return confirm('¿Está seguro de que desea eliminar esta línea?');">
+                                                            <button type="submit" name="task" value="cotizacion.deleteLine" class="btn btn-outline-danger" title="Eliminar línea">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                            <input type="hidden" name="line_id" value="<?php echo $line['id']; ?>" />
+                                                            <?php echo HTMLHelper::_('form.token'); ?>
+                                                        </form>
                                                     </div>
                                                 </td>
-                                            </tr>
-                                            <?php endforeach; ?>
-                                        <?php endif; ?>
-                                    </tbody>
-                                    <tfoot>
-                                        <tr class="table-light">
-                                            <th colspan="3" class="text-end">Total:</th>
-                                            <th class="currency-amount" id="quote-total">Q <?php echo number_format($total ?? 0, 2); ?></th>
-                                            <th></th>
+                                            <?php endif; ?>
                                         </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-light">
+                                        <th colspan="3" class="text-end">Total:</th>
+                                        <th class="currency-amount">Q <?php echo number_format($total ?? 0, 2); ?></th>
+                                        <th></th>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                 </div>
             </div>
-            <?php else: ?>
-            <!-- Message for new quotes -->
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="alert alert-info">
-                        <h6><i class="fas fa-info-circle"></i> Información Importante</h6>
-                        <p class="mb-2">Para agregar productos a la cotización, primero debe:</p>
-                        <ol class="mb-0">
-                            <li><strong>Completar la información básica</strong> (Cliente y Fecha)</li>
-                            <li><strong>Guardar la cotización</strong> para generar el número</li>
-                            <li><strong>Luego podrá agregar productos</strong> y líneas de cotización</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-            <!-- Form Actions -->
-            <div class="form-actions">
-                <div class="btn-toolbar" role="toolbar">
-                    <div class="btn-group me-2" role="group">
-                        <?php if (empty($this->item->id) || $this->item->id <= 0): ?>
-                            <button type="button" class="btn btn-success btn-lg" onclick="saveQuoteHeader()">
-                                <i class="fas fa-save"></i> Crear Cotización
-                            </button>
-                        <?php else: ?>
-                            <button type="button" class="btn btn-success btn-lg" onclick="saveQuote()">
-                                <i class="fas fa-save"></i> Guardar Cambios
-                            </button>
-                           <button type="button" class="btn btn-info" onclick="window.location.reload()">
-                               <i class="fas fa-sync-alt"></i> Actualizar
-                           </button>
-                        <?php endif; ?>
-                    </div>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-secondary" onclick="cancelQuote()">
-                            <i class="fas fa-times"></i> Cancelar
-                        </button>
-                    </div>
+        </div>
+    <?php else: ?>
+        <!-- Message for new quotes -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-info-circle"></i> Información Importante</h6>
+                    <p class="mb-2">Para agregar productos a la cotización, primero debe:</p>
+                    <ol class="mb-0">
+                        <li><strong>Completar la información básica</strong> (Cliente y Fecha)</li>
+                        <li><strong>Guardar la cotización</strong> para generar el número</li>
+                        <li><strong>Luego podrá agregar productos</strong> y líneas de cotización</li>
+                    </ol>
                 </div>
             </div>
         </div>
+    <?php endif; ?>
 
-        <!-- Hidden fields -->
-        <input type="hidden" name="task" value="" />
-        <input type="hidden" name="id" value="<?php echo (int) ($this->item->id ?? 0); ?>" />
-        <?php echo HTMLHelper::_('form.token'); ?>
-    </form>
+    <!-- Form Actions -->
+    <div class="form-actions mt-4">
+        <div class="btn-toolbar" role="toolbar">
+            <div class="btn-group me-2" role="group">
+                <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Volver a Lista
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
-
-<script>
-// Client search functionality
-let searchTimeout;
-let selectedClientId = null;
-
-// Debug logging
-console.log('Quote edit page loaded');
-
-// Set line counter for new products
-let lineCounter = <?php echo !empty($existingLines) ? count($existingLines) : 0; ?>;
-console.log('Line counter initialized to:', lineCounter);
-
-document.addEventListener('DOMContentLoaded', function() {
-    const clientSearch = document.getElementById('client_search');
-    if (clientSearch) {
-        clientSearch.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            const query = this.value.trim();
-            
-            if (query.length < 2) {
-                hideClientResults();
-                return;
-            }
-            
-            searchTimeout = setTimeout(() => {
-                searchClients(query);
-            }, 300);
-        });
-        
-        // Hide results when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.client-selector')) {
-                hideClientResults();
-            }
-        });
-    }
-});
-
-function searchClients(query) {
-    // Show loading
-    const resultsDiv = document.getElementById('client_results');
-    resultsDiv.innerHTML = '<div class="client-result-item">Buscando...</div>';
-    resultsDiv.style.display = 'block';
-    
-    // Make AJAX call to search clients
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.searchClients&format=json'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: 'search=' + encodeURIComponent(query) + '&<?php echo Session::getFormToken(); ?>=1'
-    })
-    .then(response => response.json())
-    .then(data => {
-        displayClientResults(data.clients || []);
-    })
-    .catch(error => {
-        console.error('Error searching clients:', error);
-        resultsDiv.innerHTML = '<div class="client-result-item text-danger">Error al buscar clientes</div>';
-    });
-}
-
-function displayClientResults(clients) {
-    const resultsDiv = document.getElementById('client_results');
-    
-    if (clients.length === 0) {
-        resultsDiv.innerHTML = '<div class="client-result-item text-muted">No se encontraron clientes</div>';
-        return;
-    }
-    
-    let html = '';
-    clients.forEach(client => {
-        html += `
-            <div class="client-result-item" onclick="selectClient(${client.id}, '${escapeHtml(client.name)}')">
-                <strong>${escapeHtml(client.name)}</strong>
-                ${client.email ? '<br><small class="text-muted">' + escapeHtml(client.email) + '</small>' : ''}
-            </div>
-        `;
-    });
-    
-    resultsDiv.innerHTML = html;
-}
-
-function selectClient(clientId, clientName) {
-    selectedClientId = clientId;
-    
-    // Set hidden field
-    document.getElementById('jform_partner_id').value = clientId;
-    
-    // Show selected client
-    document.getElementById('selected_client_name').textContent = clientName;
-    document.getElementById('selected_client').style.display = 'block';
-    
-    // Hide search
-    document.getElementById('client_search').style.display = 'none';
-    hideClientResults();
-}
-
-function clearClientSelection() {
-    selectedClientId = null;
-    document.getElementById('jform_partner_id').value = '';
-    document.getElementById('selected_client').style.display = 'none';
-    document.getElementById('client_search').style.display = 'block';
-    document.getElementById('client_search').value = '';
-    document.getElementById('client_search').focus();
-}
-
-function hideClientResults() {
-    document.getElementById('client_results').style.display = 'none';
-}
-
-// Form submission functions
-function saveQuote() {
-    if (validateForm()) {
-        document.querySelector('input[name="task"]').value = 'cotizacion.save';
-        document.getElementById('adminForm').submit();
-    }
-}
-
-function saveQuoteHeader() {
-    if (validateForm()) {
-        // Show loading state
-        const btn = event.target;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando Cotización...';
-        btn.disabled = true;
-        
-        document.querySelector('input[name="task"]').value = 'cotizacion.save';
-        document.getElementById('adminForm').submit();
-    }
-}
-
-function cancelQuote() {
-    if (confirm('¿Está seguro de que desea cancelar? Se perderán los cambios no guardados.')) {
-        window.location.href = '<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>';
-    }
-}
-
-function validateForm() {
-    const partnerId = document.getElementById('jform_partner_id').value;
-    const dateOrder = document.getElementById('jform_date_order').value;
-    
-    if (!partnerId) {
-        alert('Debe seleccionar un cliente');
-        return false;
-    }
-    
-    if (!dateOrder) {
-        alert('Debe seleccionar una fecha');
-        return false;
-    }
-    
-    return true;
-}
-
-// Quote Lines Management
-let quoteLines = [];
-let lineCounter = 0;
-
-// Generate next product name based on quote number
-function generateProductName() {
-    const quoteName = '<?php echo htmlspecialchars($this->item->name ?? ''); ?>';
-    lineCounter++;
-    const nextNumber = String(lineCounter).padStart(2, '0');
-    console.log('Generated product name:', quoteName + '-' + nextNumber);
-    return quoteName + '-' + nextNumber;
-}
-
-function addQuoteLine() {
-    const description = document.getElementById('product_description').value.trim();
-    const quantity = parseFloat(document.getElementById('product_quantity').value) || 1;
-    const price = parseFloat(document.getElementById('product_price').value) || 0;
-    
-    // Validation
-    if (!description) {
-        alert('Por favor ingrese la descripción del producto');
-        document.getElementById('product_description').focus();
-        return;
-    }
-    
-    if (quantity <= 0) {
-        alert('La cantidad debe ser mayor a 0');
-        document.getElementById('product_quantity').focus();
-        return;
-    }
-    
-    if (price <= 0) {
-        alert('El precio debe ser mayor a 0');
-        document.getElementById('product_price').focus();
-        return;
-    }
-    
-    // Generate product name
-    const productName = generateProductName();
-    
-    // Create line object
-    const line = {
-        id: ++lineCounter,
-        name: productName,
-        description: description,
-        quantity: quantity,
-        price: price,
-        subtotal: quantity * price
-    };
-    
-    // Add to array
-    quoteLines.push(line);
-    
-    // Send to Odoo
-    const quoteId = <?php echo (int) ($this->item->id ?? 0); ?>;
-    if (quoteId > 0) {
-        createQuoteLineInOdoo(quoteId, productName, description, quantity, price);
-    }
-    
-    // Update table
-    updateQuoteLinesTable();
-    
-    // Clear form
-    clearProductForm();
-    
-    // Focus back to description
-    document.getElementById('product_description').focus();
-}
-
-function createQuoteLineInOdoo(quoteId, productName, description, quantity, price) {
-    // Show loading state
-    const addButton = document.querySelector('.btn-success[onclick="addQuoteLine()"]');
-    const originalText = addButton.innerHTML;
-    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
-    addButton.disabled = true;
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.createLine&format=json'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: `quote_id=${quoteId}&product_name=${encodeURIComponent(productName)}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (!data.success) {
-            console.error('Error creating line in Odoo:', data.message);
-            alert('Error al crear la línea en Odoo: ' + data.message);
-        } else {
-            // Show success message
-            showSuccessMessage('Línea agregada exitosamente: ' + productName);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error de conexión al crear la línea');
-    })
-    .finally(() => {
-        // Restore button state
-        addButton.innerHTML = originalText;
-        addButton.disabled = false;
-    });
-}
-
-function editQuoteLine(lineId) {
-    console.log('editQuoteLine called with ID:', lineId);
-    
-    // Find the table row
-    const row = document.getElementById(`line-row-${lineId}`);
-    if (!row) {
-        console.error('Row not found for line ID:', lineId);
-        console.log('Available rows:', document.querySelectorAll('[id^="line-row-"]'));
-        alert('Error: No se pudo encontrar la fila para editar. ID: ' + lineId);
-        return;
-    }
-    
-    console.log('Found row:', row);
-    
-    // Get original data from row attributes
-    const originalDescription = row.getAttribute('data-original-description') || '';
-    const originalQuantity = parseFloat(row.getAttribute('data-original-quantity')) || 1;
-    const originalPrice = parseFloat(row.getAttribute('data-original-price')) || 0;
-    
-    console.log('Original data:', {originalDescription, originalQuantity, originalPrice});
-    
-    // Get product name from the first cell
-    const firstCell = row.cells[0];
-    const productName = firstCell.querySelector('strong') ? firstCell.querySelector('strong').textContent : 'Producto';
-    
-    console.log('Product name:', productName);
-    
-    // Store original content for cancel
-    if (!row.hasAttribute('data-original-content')) {
-        row.setAttribute('data-original-content', row.innerHTML);
-        console.log('Stored original content');
-    }
-    
-    console.log('Transforming row to edit mode...');
-    
-    row.innerHTML = `
-        <td>
-            <strong>${escapeHtml(productName)}</strong>
-            <br><textarea class="form-control form-control-sm" id="edit-description-${lineId}" rows="2" placeholder="Descripción del producto...">${escapeHtml(originalDescription)}</textarea>
-        </td>
-        <td>
-            <input type="number" class="form-control form-control-sm" id="edit-quantity-${lineId}" value="${originalQuantity}" min="1" step="1">
-        </td>
-        <td>
-            <div class="input-group input-group-sm">
-                <span class="input-group-text">Q</span>
-                <input type="number" class="form-control" id="edit-price-${lineId}" value="${originalPrice}" step="0.01" min="0">
-            </div>
-        </td>
-        <td class="currency-amount" id="edit-subtotal-${lineId}">Q ${(originalQuantity * originalPrice).toFixed(2)}</td>
-        <td>
-            <div class="btn-group btn-group-sm">
-                <button type="button" class="btn btn-success" onclick="saveQuoteLineEdit(${lineId})" data-line-id="${lineId}">
-                    <i class="fas fa-save"></i>
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="cancelQuoteLineEdit(${lineId})">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        </td>
-    `;
-    
-    console.log('Row transformed, setting up event listeners...');
-    
-    // Update subtotal on quantity/price change
-    const quantityInput = document.getElementById(`edit-quantity-${lineId}`);
-    const priceInput = document.getElementById(`edit-price-${lineId}`);
-    const subtotalSpan = document.getElementById(`edit-subtotal-${lineId}`);
-    
-    function updateSubtotal() {
-        const qty = parseFloat(quantityInput.value) || 0;
-        const price = parseFloat(priceInput.value) || 0;
-        const subtotal = qty * price;
-        subtotalSpan.textContent = 'Q ' + subtotal.toFixed(2);
-    }
-    
-    quantityInput.addEventListener('input', updateSubtotal);
-    priceInput.addEventListener('input', updateSubtotal);
-    
-    console.log('Event listeners added, focusing description field...');
-    
-    // Focus on description field
-    const descField = document.getElementById(`edit-description-${lineId}`);
-    if (descField) {
-        descField.focus();
-        console.log('Description field focused');
-    } else {
-        console.error('Description field not found');
-    }
-}
-
-function saveQuoteLineEdit(lineId) {
-    console.log('saveQuoteLineEdit called with ID:', lineId);
-    
-    const descField = document.getElementById(`edit-description-${lineId}`);
-    const qtyField = document.getElementById(`edit-quantity-${lineId}`);
-    const priceField = document.getElementById(`edit-price-${lineId}`);
-    
-    if (!descField || !qtyField || !priceField) {
-        console.error('Edit fields not found:', {descField, qtyField, priceField});
-        alert('Error: No se pudieron encontrar los campos de edición');
-        return;
-    }
-    
-    const description = descField.value.trim();
-    const quantity = parseFloat(qtyField.value) || 1;
-    const price = parseFloat(priceField.value) || 0;
-    
-    console.log('Save data:', {lineId, description, quantity, price});
-    
-    // Validation
-    if (!description || quantity <= 0 || price <= 0) {
-        console.log('Validation failed:', {description: !!description, quantity, price});
-        alert('Por favor complete todos los campos correctamente');
-        return;
-    }
-    
-    // Show loading state
-    const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
-    console.log('Save button found:', saveBtn);
-    
-    if (saveBtn) {
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        saveBtn.disabled = true;
-        
-        // Store original state for restoration
-        saveBtn.setAttribute('data-original-text', originalText);
-        console.log('Save button state changed to loading');
-    }
-    
-    // Update in Odoo
-    updateQuoteLineInOdoo(lineId, description, quantity, price);
-}
-
-function cancelQuoteLineEdit(lineId) {
-    console.log('Canceling line edit for ID:', lineId);
-    
-    const row = document.getElementById(`line-row-${lineId}`);
-    if (row) {
-        const originalContent = row.getAttribute('data-original-content');
-        if (originalContent) {
-            row.innerHTML = originalContent;
-            row.removeAttribute('data-original-content');
-        }
-    }
-}
-
-function updateQuoteLineInOdoo(lineId, description, quantity, price) {
-    console.log('Updating line in Odoo:', lineId, description, quantity, price);
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.updateLine&format=json'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: `line_id=${lineId}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Update response:', data);
-        if (data.success) {
-            showSuccessMessage('Línea actualizada exitosamente en Odoo');
-            // Refresh the page to reload lines from Odoo
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        } else {
-            alert('Error al actualizar la línea en Odoo: ' + data.message);
-            // Restore button state on error
-            const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
-            if (saveBtn && saveBtn.hasAttribute('data-original-text')) {
-                saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
-                saveBtn.disabled = false;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error updating line:', error);
-        alert('Error de conexión al actualizar la línea');
-        // Restore button state on error
-        const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
-        if (saveBtn && saveBtn.hasAttribute('data-original-text')) {
-            saveBtn.innerHTML = saveBtn.getAttribute('data-original-text');
-            saveBtn.disabled = false;
-        }
-    });
-}
-
-function removeQuoteLine(lineId) {
-    console.log('removeQuoteLine called with ID:', lineId);
-    
-    if (confirm('¿Está seguro de que desea eliminar esta línea?')) {
-        console.log('User confirmed deletion for line:', lineId);
-        
-        // Show loading state
-        const deleteBtn = document.querySelector(`button[onclick="removeQuoteLine(${lineId})"]`);
-        console.log('Delete button found:', deleteBtn);
-        
-        if (deleteBtn) {
-            const originalText = deleteBtn.innerHTML;
-            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            deleteBtn.disabled = true;
-            
-            // Store original state for restoration
-            deleteBtn.setAttribute('data-original-text', originalText);
-            console.log('Button state changed to loading');
-        }
-        
-        // Delete from Odoo
-        deleteQuoteLineFromOdoo(lineId);
-    } else {
-        console.log('User cancelled deletion');
-    }
-}
-
-function deleteQuoteLineFromOdoo(lineId) {
-    console.log('Deleting line from Odoo:', lineId);
-    
-    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.deleteLine&format=json'); ?>', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: `line_id=${lineId}&<?php echo Session::getFormToken(); ?>=1`
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('Delete response:', data);
-        if (data.success) {
-            showSuccessMessage('Línea eliminada exitosamente de Odoo');
-            // Refresh the page to reload lines from Odoo
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        } else {
-            alert('Error al eliminar la línea de Odoo: ' + data.message);
-            // Restore button state on error
-            const deleteBtn = document.querySelector(`button[onclick="removeQuoteLine(${lineId})"]`);
-            if (deleteBtn && deleteBtn.hasAttribute('data-original-text')) {
-                deleteBtn.innerHTML = deleteBtn.getAttribute('data-original-text');
-                deleteBtn.disabled = false;
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error deleting line:', error);
-        alert('Error de conexión al eliminar la línea');
-        // Restore button state on error
-        const deleteBtn = document.querySelector(`button[onclick="removeQuoteLine(${lineId})"]`);
-        if (deleteBtn && deleteBtn.hasAttribute('data-original-text')) {
-            deleteBtn.innerHTML = deleteBtn.getAttribute('data-original-text');
-            deleteBtn.disabled = false;
-        }
-    });
-}
-
-function updateQuoteLinesTable() {
-    const tbody = document.getElementById('quote-lines-tbody');
-    // Update in Odoo
-    updateQuoteLineInOdoo(lineId, description, quantity, price);
-    
-    let html = '';
-    let total = 0;
-    
-    quoteLines.forEach(line => {
-        total += line.subtotal;
-        html += `
-            <tr data-line-id="${line.id}">
-                <td>
-                    <strong>${escapeHtml(line.name)}</strong>
-                    <br><small class="text-muted">${escapeHtml(line.description)}</small>
-                </td>
-                <td>${line.quantity}</td>
-                <td>Q ${line.price.toFixed(2)}</td>
-                <td class="currency-amount">Q ${line.subtotal.toFixed(2)}</td>
-                <td>
-                    <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(${line.id})" title="Editar línea">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(${line.id})" title="Eliminar línea">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
-    });
-    
-    tbody.innerHTML = html;
-    document.getElementById('quote-total').textContent = 'Q ' + total.toFixed(2);
-}
-
-function clearProductForm() {
-    document.getElementById('product_quantity').value = '1';
-    document.getElementById('product_price').value = '';
-    document.getElementById('product_description').value = '';
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Show success message
-function showSuccessMessage(message) {
-    // Create success alert
-    const alertDiv = document.createElement('div');
-    alertDiv.className = 'alert alert-success alert-dismissible fade show';
-    alertDiv.innerHTML = `
-        <i class="fas fa-check-circle"></i> ${escapeHtml(message)}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    
-    // Insert at top of form
-    const formContainer = document.querySelector('.quote-form-container');
-    formContainer.insertBefore(alertDiv, formContainer.firstChild);
-    
-    // Auto-remove after 5 seconds
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.remove();
-        }
-    }, 5000);
-}
-</script>
