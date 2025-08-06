@@ -1017,4 +1017,56 @@ class OdooHelper
 
         return $status;
     }
+
+    /**
+     * Check if a quote number is valid
+     *
+     * @param   string  $quoteName  The quote name/number to validate
+     *
+     * @return  boolean  True if valid, false otherwise
+     */
+    private function isValidQuoteNumber($quoteName)
+    {
+        // Convert to string and trim
+        $quoteName = trim((string) $quoteName);
+        
+        // Check if empty
+        if (empty($quoteName)) {
+            return false;
+        }
+        
+        // Convert to lowercase for case-insensitive comparison
+        $lowerName = strtolower($quoteName);
+        
+        // List of invalid values
+        $invalidValues = [
+            'sin número',
+            'sin numero',
+            'new',
+            'draft',
+            'borrador',
+            'false',
+            'none',
+            'null',
+            'undefined'
+        ];
+        
+        // Check against invalid values
+        if (in_array($lowerName, $invalidValues)) {
+            return false;
+        }
+        
+        // Must be at least 3 characters
+        if (strlen($quoteName) < 3) {
+            return false;
+        }
+        
+        // Must contain at least one letter or number
+        if (!preg_match('/[a-zA-Z0-9]/', $quoteName)) {
+            return false;
+        }
+        
+        // Valid quote number
+        return true;
+    }
 }
