@@ -130,7 +130,11 @@ class OdooHelper
                     Factory::getApplication()->enqueueMessage("Comparing: {$a['name']} ($numA) vs {$b['name']} ($numB)", 'info');
                 }
                 
-                return $numB - $numA; // Descending order (highest first)
+                // Ensure proper integer comparison for descending order
+                if ($numB == $numA) {
+                    return 0;
+                }
+                return ($numB > $numA) ? 1 : -1; // Descending order (highest first)
             });
 
             return $processedQuotes;
@@ -1002,16 +1006,17 @@ class OdooHelper
         // Convert to string and trim
         $quoteName = trim((string) $quoteName);
         
-        // For quotes like S00010, SO123, etc., extract the numeric part
-        if (preg_match('/([A-Za-z]*)(\d+)/', $quoteName, $matches)) {
-            return (int) $matches[2]; // Return the numeric part
+        // For quotes like S00010, S00005, etc., extract the numeric part
+        if (preg_match('/^[A-Za-z]*(\d+)/', $quoteName, $matches)) {
+            $number = (int) $matches[1]; // Return the numeric part
+            return $number;
         }
         
         // Fallback: extract all numbers and use the largest
         preg_match_all('/\d+/', $quoteName, $matches);
         if (!empty($matches[0])) {
             $numbers = array_map('intval', $matches[0]);
-            return max($numbers); // Use the largest number found
+            return max($numbers);
         }
         
         // If no numbers found, return 0 for sorting
