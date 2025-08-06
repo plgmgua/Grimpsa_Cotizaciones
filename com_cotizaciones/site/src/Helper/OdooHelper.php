@@ -41,9 +41,273 @@ class OdooHelper
         $this->baseUrl = str_replace('/xmlrpc/2/object', '', $fullUrl);
         
         $this->database = $params->get('odoo_database', 'grupoimpre');
-        $this->username = $params->get('odoo_username', 'admin'); // We need username, not user ID
+        $this->username = $params->get('odoo_username', 'admin');
         $this->password = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
         $this->debug = $params->get('enable_debug', 0);
+    }
+
+    /**
+     * Get comprehensive connection diagnostics
+     *
+     * @return  array  Detailed diagnostic information
+     */
+    public function getConnectionDiagnostics()
+    {
+        $diagnostics = [
+            'step' => 'Starting diagnostics',
+            'config' => [
+                'base_url' => $this->baseUrl,
+                'database' => $this->database,
+                'username' => $this->username,
+                'password_set' => !empty($this->password),
+                'password_length' => strlen($this->password),
+            ],
+            'tests' => [],
+            'errors' => [],
+            'success' => false
+        ];
+
+        // Test 1: Check cURL availability
+        $diagnostics['tests']['curl_available'] = function_exists('curl_init');
+        if (!$diagnostics['tests']['curl_available']) {
+            $diagnostics['errors'][] = 'cURL extension is not available';
+            return $diagnostics;
+        }
+
+        // Test 2: Test basic connectivity to Odoo server
+        $diagnostics['step'] = 'Testing basic connectivity';
+        $connectTest = $this->testBasicConnectivity();
+        $diagnostics['tests']['basic_connectivity'] = $connectTest['success'];
+        if (!$connectTest['success']) {
+            $diagnostics['errors'][] = 'Basic connectivity failed: ' . $connectTest['error'];
+        }
+
+        // Test 3: Test common endpoint
+        $diagnostics['step'] = 'Testing common endpoint';
+        $commonTest = $this->testCommonEndpoint();
+        $diagnostics['tests']['common_endpoint'] = $commonTest['success'];
+        if (!$commonTest['success']) {
+            $diagnostics['errors'][] = 'Common endpoint failed: ' . $commonTest['error'];
+        } else {
+            $diagnostics['tests']['common_response'] = $commonTest['response'];
+        }
+
+        // Test 4: Test authentication
+        $diagnostics['step'] = 'Testing authentication';
+        $authTest = $this->testAuthentication();
+        $diagnostics['tests']['authentication'] = $authTest['success'];
+        if (!$authTest['success']) {
+            $diagnostics['errors'][] = 'Authentication failed: ' . $authTest['error'];
+        } else {
+            $diagnostics['tests']['uid'] = $authTest['uid'];
+            $this->uid = $authTest['uid'];
+        }
+
+        // Test 5: Test object endpoint (only if authenticated)
+        if ($authTest['success']) {
+            $diagnostics['step'] = 'Testing object endpoint';
+            $objectTest = $this->testObjectEndpoint();
+            $diagnostics['tests']['object_endpoint'] = $objectTest['success'];
+            if (!$objectTest['success']) {
+                $diagnostics['errors'][] = 'Object endpoint failed: ' . $objectTest['error'];
+            } else {
+                $diagnostics['tests']['object_response'] = $objectTest['response'];
+            }
+
+            // Test 6: Test actual quote search
+            $diagnostics['step'] = 'Testing quote search';
+            $searchTest = $this->testQuoteSearch();
+            $diagnostics['tests']['quote_search'] = $searchTest['success'];
+            if (!$searchTest['success']) {
+                $diagnostics['errors'][] = 'Quote search failed: ' . $searchTest['error'];
+            } else {
+                $diagnostics['tests']['quotes_found'] = count($searchTest['quotes']);
+                $diagnostics['success'] = true;
+            }
+        }
+
+        $diagnostics['step'] = 'Diagnostics complete';
+        return $diagnostics;
+    }
+
+    /**
+     * Test basic connectivity to Odoo server
+     */
+    private function testBasicConnectivity()
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $this->baseUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_NOBODY => true, // HEAD request only
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($result === false || !empty($error)) {
+            return ['success' => false, 'error' => $error ?: 'Unknown cURL error'];
+        }
+
+        if ($httpCode >= 400) {
+            return ['success' => false, 'error' => "HTTP $httpCode"];
+        }
+
+        return ['success' => true, 'http_code' => $httpCode];
+    }
+
+    /**
+     * Test common endpoint
+     */
+    private function testCommonEndpoint()
+    {
+        $url = $this->baseUrl . '/xmlrpc/2/common';
+        
+        // Simple version call
+        $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>version</methodName>
+    <params></params>
+</methodCall>';
+
+        $response = $this->makeCurlRequest($url, $xmlRequest);
+        
+        if ($response === false) {
+            return ['success' => false, 'error' => 'No response from common endpoint'];
+        }
+
+        $result = $this->parseXmlResponse($response);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'Invalid XML response', 'raw_response' => substr($response, 0, 500)];
+        }
+
+        return ['success' => true, 'response' => $result];
+    }
+
+    /**
+     * Test authentication
+     */
+    private function testAuthentication()
+    {
+        $url = $this->baseUrl . '/xmlrpc/2/common';
+        
+        $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>authenticate</methodName>
+    <params>
+        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($this->username) . '</string></value></param>
+        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
+        <param><value><struct></struct></value></param>
+    </params>
+</methodCall>';
+
+        $response = $this->makeCurlRequest($url, $xmlRequest);
+        
+        if ($response === false) {
+            return ['success' => false, 'error' => 'No response from authentication'];
+        }
+
+        $result = $this->parseXmlResponse($response);
+        
+        if ($result === false || !is_numeric($result)) {
+            return ['success' => false, 'error' => 'Invalid authentication response: ' . print_r($result, true)];
+        }
+
+        return ['success' => true, 'uid' => (int) $result];
+    }
+
+    /**
+     * Test object endpoint
+     */
+    private function testObjectEndpoint()
+    {
+        if (!$this->uid) {
+            return ['success' => false, 'error' => 'No UID available'];
+        }
+
+        $url = $this->baseUrl . '/xmlrpc/2/object';
+        
+        // Test with a simple search_count call
+        $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>execute_kw</methodName>
+    <params>
+        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
+        <param><value><int>' . $this->uid . '</int></value></param>
+        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
+        <param><value><string>sale.order</string></value></param>
+        <param><value><string>search_count</string></value></param>
+        <param><value><array><data>
+            <value><array><data></data></array></value>
+        </data></array></value></param>
+    </params>
+</methodCall>';
+
+        $response = $this->makeCurlRequest($url, $xmlRequest);
+        
+        if ($response === false) {
+            return ['success' => false, 'error' => 'No response from object endpoint'];
+        }
+
+        $result = $this->parseXmlResponse($response);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'Invalid object response', 'raw_response' => substr($response, 0, 500)];
+        }
+
+        return ['success' => true, 'response' => $result];
+    }
+
+    /**
+     * Test quote search
+     */
+    private function testQuoteSearch()
+    {
+        if (!$this->uid) {
+            return ['success' => false, 'error' => 'No UID available'];
+        }
+
+        $url = $this->baseUrl . '/xmlrpc/2/object';
+        
+        // Search for quotes with limit
+        $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+    <methodName>execute_kw</methodName>
+    <params>
+        <param><value><string>' . htmlspecialchars($this->database) . '</string></value></param>
+        <param><value><int>' . $this->uid . '</int></value></param>
+        <param><value><string>' . htmlspecialchars($this->password) . '</string></value></param>
+        <param><value><string>sale.order</string></value></param>
+        <param><value><string>search</string></value></param>
+        <param><value><array><data>
+            <value><array><data></data></array></value>
+            <value><struct>
+                <member><name>limit</name><value><int>5</int></value></member>
+            </struct></value>
+        </data></array></value></param>
+    </params>
+</methodCall>';
+
+        $response = $this->makeCurlRequest($url, $xmlRequest);
+        
+        if ($response === false) {
+            return ['success' => false, 'error' => 'No response from quote search'];
+        }
+
+        $result = $this->parseXmlResponse($response);
+        
+        if ($result === false) {
+            return ['success' => false, 'error' => 'Invalid search response'];
+        }
+
+        return ['success' => true, 'quotes' => is_array($result) ? $result : []];
     }
 
     /**
@@ -127,8 +391,8 @@ class OdooHelper
                 'Content-Type: text/xml',
                 'Content-Length: ' . strlen($xmlData)
             ],
-            CURLOPT_SSL_VERIFYPEER => false, // For development - should be true in production
-            CURLOPT_SSL_VERIFYHOST => false, // For development - should be true in production
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
         ]);
 
         $response = curl_exec($ch);

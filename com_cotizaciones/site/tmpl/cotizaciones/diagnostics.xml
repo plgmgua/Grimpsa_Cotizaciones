@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+    <layout title="Diagnóstico de Conexión Odoo">
+        <message>
+            <![CDATA[Herramienta de diagnóstico para verificar la conexión con Odoo y identificar problemas]]>
+        </message>
+    </layout>
+</metadata>
