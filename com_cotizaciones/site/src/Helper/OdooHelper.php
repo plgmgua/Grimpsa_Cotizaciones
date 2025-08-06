@@ -233,11 +233,30 @@ class OdooHelper
                     continue;
                 }
 
+                // Skip lines without valid product names or with placeholder data
+                $productName = $this->getProductName($line);
+                if (empty($productName) || 
+                    $productName === 'Producto no disponible' || 
+                    strpos($productName, 'Producto ID:') === 0) {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Skipping invalid product line: ' . $productName, 'info');
+                    }
+                    continue;
+                }
+
+                // Skip lines with empty or invalid descriptions
+                $description = isset($line['name']) ? trim($line['name']) : '';
+                if (empty($description)) {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Skipping line with empty description', 'info');
+                    }
+                    continue;
+                }
                 $processedLines[] = [
                     'id' => isset($line['id']) ? $line['id'] : 0,
                     'product_id' => $this->getProductId($line),
                     'product_name' => $this->getProductName($line),
-                    'name' => isset($line['name']) ? $line['name'] : '',
+                    'name' => $description,
                     'product_uom_qty' => isset($line['product_uom_qty']) ? $line['product_uom_qty'] : 1,
                     'price_unit' => isset($line['price_unit']) ? $line['price_unit'] : 0.00,
                     'price_subtotal' => isset($line['price_subtotal']) ? $line['price_subtotal'] : 0.00

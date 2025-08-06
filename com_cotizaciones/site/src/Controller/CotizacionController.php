@@ -233,6 +233,81 @@ class CotizacionController extends FormController
     }
 
     /**
+     * Update quote line via AJAX
+     *
+     * @return  void
+     */
+    public function updateLine()
+    {
+        $app = Factory::getApplication();
+        $input = $app->input;
+        
+        // Set JSON response
+        $app->getDocument()->setMimeEncoding('application/json');
+        
+        $lineId = $input->getInt('line_id');
+        $description = $input->getString('description');
+        $quantity = $input->getFloat('quantity');
+        $price = $input->getFloat('price');
+        
+        if (!$lineId || !$description || !$quantity || !$price) {
+            echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
+            $app->close();
+        }
+        
+        try {
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $result = $helper->updateQuoteLine($lineId, $description, $quantity, $price);
+            
+            if ($result) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update quote line']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        
+        $app->close();
+    }
+
+    /**
+     * Delete quote line via AJAX
+     *
+     * @return  void
+     */
+    public function deleteLine()
+    {
+        $app = Factory::getApplication();
+        $input = $app->input;
+        
+        // Set JSON response
+        $app->getDocument()->setMimeEncoding('application/json');
+        
+        $lineId = $input->getInt('line_id');
+        
+        if (!$lineId) {
+            echo json_encode(['success' => false, 'message' => 'Missing line ID']);
+            $app->close();
+        }
+        
+        try {
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $result = $helper->deleteQuoteLine($lineId);
+            
+            if ($result) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete quote line']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        
+        $app->close();
+    }
+
+    /**
      * Method to cancel an operation
      *
      * @param   string  $key  The name of the primary key of the URL variable.
