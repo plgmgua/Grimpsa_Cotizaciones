@@ -75,7 +75,7 @@ function getStateLabel($state) {
     <!-- Main Actions Ribbon -->
     <div class="quotes-ribbon">
         <div class="row">
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="adminForm" id="adminForm">
                     <div class="input-group">
                         <span class="input-group-text">
@@ -88,18 +88,39 @@ function getStateLabel($state) {
                         <button class="btn btn-outline-secondary" type="submit">
                             Buscar
                         </button>
-                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                        <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
                             <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                                class="btn btn-outline-warning" title="Limpiar búsqueda">
                                 <i class="fas fa-times"></i>
                             </a>
                         <?php endif; ?>
                     </div>
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($this->state->get('filter.state', '')); ?>" />
                     <input type="hidden" name="task" value="" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
+                <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="stateForm" id="stateForm">
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-filter"></i>
+                        </span>
+                        <select name="filter_state" class="form-select" onchange="this.form.submit()">
+                            <option value="">Todos los Estados</option>
+                            <option value="draft" <?php echo ($this->state->get('filter.state', '') == 'draft') ? 'selected' : ''; ?>>Borrador</option>
+                            <option value="sent" <?php echo ($this->state->get('filter.state', '') == 'sent') ? 'selected' : ''; ?>>Enviada</option>
+                            <option value="sale" <?php echo ($this->state->get('filter.state', '') == 'sale') ? 'selected' : ''; ?>>Confirmada</option>
+                            <option value="done" <?php echo ($this->state->get('filter.state', '') == 'done') ? 'selected' : ''; ?>>Completada</option>
+                            <option value="cancel" <?php echo ($this->state->get('filter.state', '') == 'cancel') ? 'selected' : ''; ?>>Cancelada</option>
+                        </select>
+                    </div>
+                    <input type="hidden" name="task" value="" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" />
+                    <?php echo HTMLHelper::_('form.token'); ?>
+                </form>
+            </div>
+            <div class="col-md-2">
                 <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" method="post" name="limitForm" id="limitForm">
                     <div class="input-group">
                         <span class="input-group-text">
@@ -113,10 +134,11 @@ function getStateLabel($state) {
                     </div>
                     <input type="hidden" name="task" value="" />
                     <input type="hidden" name="filter_search" value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" />
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($this->state->get('filter.state', '')); ?>" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
-            <div class="col-md-3 text-end">
+            <div class="col-md-4 text-end">
                 <div class="btn-group" role="group">
                     <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0'); ?>" 
                        class="btn btn-success btn-lg">
@@ -129,15 +151,22 @@ function getStateLabel($state) {
             </div>
         </div>
         
-        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+        <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
             <div class="row mt-3">
                 <div class="col-12">
                     <div class="alert alert-info mb-0">
-                        <i class="fas fa-search"></i> 
-                        Mostrando resultados para: <strong>"<?php echo safeEscape($this->state->get('filter.search', '')); ?>"</strong>
+                        <i class="fas fa-filter"></i> 
+                        Filtros activos:
+                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                            <strong>Búsqueda:</strong> "<?php echo safeEscape($this->state->get('filter.search', '')); ?>"
+                        <?php endif; ?>
+                        <?php if (!empty($this->state->get('filter.state', ''))): ?>
+                            <?php if (!empty($this->state->get('filter.search', ''))): ?> | <?php endif; ?>
+                            <strong>Estado:</strong> <?php echo getStateLabel($this->state->get('filter.state', '')); ?>
+                        <?php endif; ?>
                         <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                            class="btn btn-sm btn-outline-primary ms-2">
-                            Ver todas las cotizaciones
+                            Limpiar Filtros
                         </a>
                     </div>
                 </div>
@@ -149,15 +178,20 @@ function getStateLabel($state) {
     <!-- Quotes Table -->
     <div class="quotes-table-container">
         <?php if (empty($this->items) || !is_array($this->items)): ?>
-            <?php if (!empty($this->state->get('filter.search', ''))): ?>
+            <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
                 <div class="alert alert-warning">
                     <h4><i class="fas fa-search"></i> No se Encontraron Resultados</h4>
-                    <p>No se encontraron cotizaciones que coincidan con "<strong><?php echo safeEscape($this->state->get('filter.search', '')); ?></strong>".</p>
+                    <p>No se encontraron cotizaciones que coincidan con los filtros aplicados.</p>
                     <p>Intenta con:</p>
                     <ul>
-                        <li>Verificar la ortografía del nombre del cliente</li>
-                        <li>Usar solo parte del nombre del cliente</li>
-                        <li>Buscar con términos más generales</li>
+                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                            <li>Verificar la ortografía del nombre del cliente</li>
+                            <li>Usar términos de búsqueda más generales</li>
+                        <?php endif; ?>
+                        <?php if (!empty($this->state->get('filter.state', ''))): ?>
+                            <li>Seleccionar un estado diferente</li>
+                        <?php endif; ?>
+                        <li>Limpiar todos los filtros</li>
                     </ul>
                     <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                        class="btn btn-primary">

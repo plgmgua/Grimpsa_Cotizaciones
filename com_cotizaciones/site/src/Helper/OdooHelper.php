@@ -530,10 +530,11 @@ class OdooHelper
      * @param   integer  $page       Page number
      * @param   integer  $limit      Items per page
      * @param   string   $search     Search term
+     * @param   string   $stateFilter State filter
      *
      * @return  array    Array of quotes
      */
-    public function getQuotesByAgent($agentName, $page = 1, $limit = 20, $search = '')
+    public function getQuotesByAgent($agentName, $page = 1, $limit = 20, $search = '', $stateFilter = '')
     {
         try {
             // Build domain filters
@@ -544,6 +545,11 @@ class OdooHelper
             // Add search filter if provided
             if (!empty($search)) {
                 $domain[] = ['partner_id.name', 'ilike', $search];
+            }
+
+            // Add state filter if provided
+            if (!empty($stateFilter)) {
+                $domain[] = ['state', '=', $stateFilter];
             }
 
             // Calculate offset

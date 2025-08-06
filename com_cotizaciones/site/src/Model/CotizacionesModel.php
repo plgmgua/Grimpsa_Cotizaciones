@@ -30,7 +30,7 @@ class CotizacionesModel extends ListModel
     {
         if (empty($config['filter_fields'])) {
             $config['filter_fields'] = [
-                'id', 'name', 'partner_id', 'date_order', 'amount_total', 'state'
+                'id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'filter.state'
             ];
         }
 
@@ -57,10 +57,11 @@ class CotizacionesModel extends ListModel
             $limitstart = $this->getStart();
             $limit = $this->getState('list.limit', 20);
             $search = $this->getState('filter.search', '');
+            $stateFilter = $this->getState('filter.state', '');
             
             $page = floor($limitstart / $limit) + 1;
             
-            $quotes = $helper->getQuotesByAgent($user->name, $page, $limit, $search);
+            $quotes = $helper->getQuotesByAgent($user->name, $page, $limit, $search, $stateFilter);
             
             // Ensure we return a proper array
             if (!is_array($quotes)) {
@@ -145,6 +146,10 @@ class CotizacionesModel extends ListModel
         $search = $app->input->get('filter_search', '', 'string');
         $search = trim($search);
         $this->setState('filter.search', $search);
+
+        // Get the state filter
+        $stateFilter = $app->input->get('filter_state', '', 'string');
+        $this->setState('filter.state', $stateFilter);
 
         // Set the ordering (newest first by default)
         $this->setState('list.ordering', $ordering);
