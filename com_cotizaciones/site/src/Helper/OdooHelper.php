@@ -124,7 +124,13 @@ class OdooHelper
             usort($processedQuotes, function($a, $b) {
                 $numA = $this->extractQuoteNumber($a['name']);
                 $numB = $this->extractQuoteNumber($b['name']);
-                return $numB - $numA; // Descending order
+                
+                // Debug the numbers being compared
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage("Comparing: {$a['name']} ($numA) vs {$b['name']} ($numB)", 'info');
+                }
+                
+                return $numB - $numA; // Descending order (highest first)
             });
 
             return $processedQuotes;
@@ -996,13 +1002,16 @@ class OdooHelper
         // Convert to string and trim
         $quoteName = trim((string) $quoteName);
         
-        // Extract all numbers from the quote name
-        preg_match_all('/\d+/', $quoteName, $matches);
+        // For quotes like S00010, SO123, etc., extract the numeric part
+        if (preg_match('/([A-Za-z]*)(\d+)/', $quoteName, $matches)) {
+            return (int) $matches[2]; // Return the numeric part
+        }
         
+        // Fallback: extract all numbers and use the largest
+        preg_match_all('/\d+/', $quoteName, $matches);
         if (!empty($matches[0])) {
-            // Use the last (usually largest) number found
-            $numbers = $matches[0];
-            return (int) end($numbers);
+            $numbers = array_map('intval', $matches[0]);
+            return max($numbers); // Use the largest number found
         }
         
         // If no numbers found, return 0 for sorting
