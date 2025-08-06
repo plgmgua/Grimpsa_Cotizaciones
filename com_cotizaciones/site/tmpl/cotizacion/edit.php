@@ -93,14 +93,40 @@ $user = Factory::getUser();
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="mb-3">
-                                        <label for="jform_partner_id" class="form-label">
-                                            Cliente *
-                                        </label>
-                                        <input type="text" name="jform[partner_id]" id="jform_partner_id" 
-                                               value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" 
-                                               class="form-control required" required 
-                                               placeholder="ID del cliente" />
-                                        <small class="form-text text-muted">Ingrese el ID del cliente (requerido para generar la cotización)</small>
+                                        <?php if ($isNew): ?>
+                                            <label for="client_search" class="form-label">
+                                                Cliente *
+                                            </label>
+                                            <div class="client-selector">
+                                                <input type="text" id="client_search" 
+                                                       class="form-control" 
+                                                       placeholder="Buscar cliente por nombre..." 
+                                                       autocomplete="off" />
+                                                <div id="client_results" class="client-results" style="display: none;"></div>
+                                                <input type="hidden" name="jform[partner_id]" id="jform_partner_id" 
+                                                       value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" 
+                                                       class="required" required />
+                                                <div id="selected_client" class="selected-client" style="display: none;">
+                                                    <div class="alert alert-success">
+                                                        <strong>Cliente seleccionado:</strong> <span id="selected_client_name"></span>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger ms-2" onclick="clearClientSelection()">
+                                                            <i class="fas fa-times"></i> Cambiar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <small class="form-text text-muted">Busque y seleccione un cliente existente</small>
+                                        <?php else: ?>
+                                            <label for="jform_client_name" class="form-label">
+                                                Cliente
+                                            </label>
+                                            <input type="text" id="jform_client_name" 
+                                                   value="<?php echo htmlspecialchars($this->item->contact_name ?? 'Cliente no disponible'); ?>" 
+                                                   class="form-control" readonly />
+                                            <input type="hidden" name="jform[partner_id]" 
+                                                   value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" />
+                                            <small class="form-text text-muted">El cliente no se puede cambiar una vez creada la cotización</small>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
@@ -178,7 +204,9 @@ $user = Factory::getUser();
                                                 <div class="mb-3">
                                                     <label for="product_name" class="form-label">Nombre del Producto *</label>
                                                     <input type="text" id="product_name" class="form-control" 
-                                                           placeholder="Ej: Tarjetas de presentación" required />
+                                                           value="" readonly 
+                                                           placeholder="Se generará automáticamente" />
+                                                    <small class="form-text text-muted">Se genera automáticamente como PROD-001, PROD-002, etc.</small>
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
@@ -204,9 +232,9 @@ $user = Factory::getUser();
                                                 <div class="mb-3">
                                                     <label for="product_description" class="form-label">Descripción del Producto</label>
                                                     <textarea id="product_description" class="form-control" rows="3" 
-                                                              placeholder="Descripción detallada del producto o servicio..."></textarea>
+                                                              placeholder="Descripción detallada del producto o servicio..." required></textarea>
                                                     <small class="form-text text-muted">
-                                                        Incluye especificaciones, materiales, dimensiones, etc.
+                                                        Incluye especificaciones, materiales, dimensiones, etc. (Requerido)
                                                     </small>
                                                 </div>
                                             </div>
@@ -302,6 +330,110 @@ $user = Factory::getUser();
 </div>
 
 <script>
+// Client search functionality
+let searchTimeout;
+let selectedClientId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const clientSearch = document.getElementById('client_search');
+    if (clientSearch) {
+        clientSearch.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                hideClientResults();
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                searchClients(query);
+            }, 300);
+        });
+        
+        // Hide results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.client-selector')) {
+                hideClientResults();
+            }
+        });
+    }
+});
+
+function searchClients(query) {
+    // Show loading
+    const resultsDiv = document.getElementById('client_results');
+    resultsDiv.innerHTML = '<div class="client-result-item">Buscando...</div>';
+    resultsDiv.style.display = 'block';
+    
+    // Make AJAX call to search clients
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.searchClients&format=json'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: 'search=' + encodeURIComponent(query) + '&<?php echo Session::getFormToken(); ?>=1'
+    })
+    .then(response => response.json())
+    .then(data => {
+        displayClientResults(data.clients || []);
+    })
+    .catch(error => {
+        console.error('Error searching clients:', error);
+        resultsDiv.innerHTML = '<div class="client-result-item text-danger">Error al buscar clientes</div>';
+    });
+}
+
+function displayClientResults(clients) {
+    const resultsDiv = document.getElementById('client_results');
+    
+    if (clients.length === 0) {
+        resultsDiv.innerHTML = '<div class="client-result-item text-muted">No se encontraron clientes</div>';
+        return;
+    }
+    
+    let html = '';
+    clients.forEach(client => {
+        html += `
+            <div class="client-result-item" onclick="selectClient(${client.id}, '${escapeHtml(client.name)}')">
+                <strong>${escapeHtml(client.name)}</strong>
+                ${client.email ? '<br><small class="text-muted">' + escapeHtml(client.email) + '</small>' : ''}
+            </div>
+        `;
+    });
+    
+    resultsDiv.innerHTML = html;
+}
+
+function selectClient(clientId, clientName) {
+    selectedClientId = clientId;
+    
+    // Set hidden field
+    document.getElementById('jform_partner_id').value = clientId;
+    
+    // Show selected client
+    document.getElementById('selected_client_name').textContent = clientName;
+    document.getElementById('selected_client').style.display = 'block';
+    
+    // Hide search
+    document.getElementById('client_search').style.display = 'none';
+    hideClientResults();
+}
+
+function clearClientSelection() {
+    selectedClientId = null;
+    document.getElementById('jform_partner_id').value = '';
+    document.getElementById('selected_client').style.display = 'none';
+    document.getElementById('client_search').style.display = 'block';
+    document.getElementById('client_search').value = '';
+    document.getElementById('client_search').focus();
+}
+
+function hideClientResults() {
+    document.getElementById('client_results').style.display = 'none';
+}
+
 // Form submission functions
 function saveQuote() {
     if (validateForm()) {
@@ -334,7 +466,7 @@ function validateForm() {
     const dateOrder = document.getElementById('jform_date_order').value;
     
     if (!partnerId) {
-        alert('Debe ingresar un ID de cliente');
+        alert('Debe seleccionar un cliente');
         return false;
     }
     
@@ -349,17 +481,24 @@ function validateForm() {
 // Quote Lines Management
 let quoteLines = [];
 let lineCounter = 0;
+let productCounter = 1;
+
+// Generate next product name
+function generateProductName() {
+    const name = 'PROD-' + String(productCounter).padStart(3, '0');
+    productCounter++;
+    return name;
+}
 
 function addQuoteLine() {
-    const name = document.getElementById('product_name').value.trim();
+    const description = document.getElementById('product_description').value.trim();
     const quantity = parseFloat(document.getElementById('product_quantity').value) || 1;
     const price = parseFloat(document.getElementById('product_price').value) || 0;
-    const description = document.getElementById('product_description').value.trim();
     
     // Validation
-    if (!name) {
-        alert('Por favor ingrese el nombre del producto');
-        document.getElementById('product_name').focus();
+    if (!description) {
+        alert('Por favor ingrese la descripción del producto');
+        document.getElementById('product_description').focus();
         return;
     }
     
@@ -375,18 +514,28 @@ function addQuoteLine() {
         return;
     }
     
+    // Generate product name
+    const productName = generateProductName();
+    document.getElementById('product_name').value = productName;
+    
     // Create line object
     const line = {
         id: ++lineCounter,
-        name: name,
+        name: productName,
+        description: description,
         quantity: quantity,
         price: price,
-        description: description,
         subtotal: quantity * price
     };
     
     // Add to array
     quoteLines.push(line);
+    
+    // Send to Odoo
+    const quoteId = <?php echo (int) ($this->item->id ?? 0); ?>;
+    if (quoteId > 0) {
+        createQuoteLineInOdoo(quoteId, productName, description, quantity, price);
+    }
     
     // Update table
     updateQuoteLinesTable();
@@ -394,8 +543,30 @@ function addQuoteLine() {
     // Clear form
     clearProductForm();
     
-    // Focus back to product name
-    document.getElementById('product_name').focus();
+    // Focus back to description
+    document.getElementById('product_description').focus();
+}
+
+function createQuoteLineInOdoo(quoteId, productName, description, quantity, price) {
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.createLine&format=json'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: `quote_id=${quoteId}&product_name=${encodeURIComponent(productName)}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            console.error('Error creating line in Odoo:', data.message);
+            alert('Error al crear la línea en Odoo: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error de conexión al crear la línea');
+    });
 }
 
 function removeQuoteLine(lineId) {
@@ -424,7 +595,7 @@ function updateQuoteLinesTable() {
             <tr>
                 <td>
                     <strong>${escapeHtml(line.name)}</strong>
-                    ${line.description ? '<br><small class="text-muted">' + escapeHtml(line.description) + '</small>' : ''}
+                    <br><small class="text-muted">${escapeHtml(line.description)}</small>
                 </td>
                 <td>${line.quantity}</td>
                 <td>Q ${line.price.toFixed(2)}</td>
@@ -443,7 +614,7 @@ function updateQuoteLinesTable() {
 }
 
 function clearProductForm() {
-    document.getElementById('product_name').value = '';
+    document.getElementById('product_name').value = generateProductName();
     document.getElementById('product_quantity').value = '1';
     document.getElementById('product_price').value = '';
     document.getElementById('product_description').value = '';

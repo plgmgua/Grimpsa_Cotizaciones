@@ -194,6 +194,228 @@ class OdooHelper
     }
 
     /**
+     * Get list of clients/partners from Odoo
+     *
+     * @param   string  $search  Search term for client name
+     *
+     * @return  array   Array of clients
+     */
+    public function getClients($search = '')
+    {
+        try {
+            $domain = [['is_company', '=', true]];
+            
+            if (!empty($search)) {
+                $domain[] = ['name', 'ilike', $search];
+            }
+            
+            $clients = $this->odooCall('res.partner', 'search_read', $domain,
+                ['id', 'name', 'email', 'phone'],
+                ['limit' => 50, 'order' => 'name asc']
+            );
+            
+            if ($clients === false || !is_array($clients)) {
+                return [];
+            }
+            
+            return $clients;
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error getting clients: ' . $e->getMessage(), 'error');
+            }
+            return [];
+        }
+    }
+
+    /**
+     * Create a quote line in Odoo
+     *
+     * @param   integer  $quoteId      The quote ID
+     * @param   string   $productName  Product name (incremental)
+     * @param   string   $description  Product description
+     * @param   float    $quantity     Quantity
+     * @param   float    $price        Unit price
+     *
+     * @return  integer|false  Line ID or false
+     */
+    public function createQuoteLine($quoteId, $productName, $description, $quantity, $price)
+    {
+        try {
+            // First, create or get the product
+            $productId = $this->getOrCreateProduct($productName, $description, $price);
+            
+            if (!$productId) {
+                return false;
+            }
+            
+            // Create the quote line
+            $lineData = [
+                'order_id' => (int) $quoteId,
+                'product_id' => $productId,
+                'name' => $description,
+                'product_uom_qty' => (float) $quantity,
+                'price_unit' => (float) $price
+            ];
+            
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order.line</string></value>
+      </param>
+      <param>
+         <value><string>create</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><struct>';
+
+            foreach ($lineData as $key => $value) {
+                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
+                if (is_int($value)) {
+                    $xmlRequest .= '<value><int>' . $value . '</int></value>';
+                } elseif (is_float($value)) {
+                    $xmlRequest .= '<value><double>' . $value . '</double></value>';
+                } else {
+                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
+                }
+                $xmlRequest .= '</member>';
+            }
+
+            $xmlRequest .= '</struct></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+
+            if ($result && is_numeric($result)) {
+                return (int) $result;
+            }
+
+            return false;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error creating quote line: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Get or create a product with incremental naming
+     *
+     * @param   string  $productName   Base product name
+     * @param   string  $description   Product description
+     * @param   float   $price         Default price
+     *
+     * @return  integer|false  Product ID or false
+     */
+    private function getOrCreateProduct($productName, $description, $price)
+    {
+        try {
+            // Search for existing product with this name
+            $products = $this->odooCall('product.product', 'search_read',
+                [['name', '=', $productName]],
+                ['id', 'name']
+            );
+            
+            if ($products && is_array($products) && count($products) > 0) {
+                return (int) $products[0]['id'];
+            }
+            
+            // Create new product
+            $productData = [
+                'name' => $productName,
+                'description' => $description,
+                'list_price' => (float) $price,
+                'type' => 'service',
+                'sale_ok' => true
+            ];
+            
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>product.product</string></value>
+      </param>
+      <param>
+         <value><string>create</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><struct>';
+
+            foreach ($productData as $key => $value) {
+                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
+                if (is_bool($value)) {
+                    $xmlRequest .= '<value><boolean>' . ($value ? '1' : '0') . '</boolean></value>';
+                } elseif (is_float($value)) {
+                    $xmlRequest .= '<value><double>' . $value . '</double></value>';
+                } else {
+                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
+                }
+                $xmlRequest .= '</member>';
+            }
+
+            $xmlRequest .= '</struct></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+
+            if ($result && is_numeric($result)) {
+                return (int) $result;
+            }
+
+            return false;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error creating product: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
      * Create a new quote
      *
      * @param   array  $data  Quote data

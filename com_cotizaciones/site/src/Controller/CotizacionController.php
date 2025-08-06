@@ -101,15 +101,21 @@ class CotizacionController extends FormController
             if ($quoteId > 0) {
                 $result = $model->updateQuote($quoteId, $data);
                 $message = 'Cotización actualizada exitosamente';
+                $redirectUrl = Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId);
             } else {
                 $result = $model->createQuote($data);
                 $message = 'Cotización creada exitosamente';
-                $quoteId = $result;
+                if ($result !== false) {
+                    $quoteId = $result;
+                    $redirectUrl = Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId);
+                } else {
+                    $redirectUrl = Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0');
+                }
             }
 
             if ($result !== false) {
                 $this->app->enqueueMessage($message, 'success');
-                $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizaciones'));
+                $this->setRedirect($redirectUrl);
             } else {
                 $this->app->enqueueMessage('Error al guardar la cotización', 'error');
                 $this->setRedirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . $quoteId));
@@ -120,6 +126,78 @@ class CotizacionController extends FormController
         }
 
         return true;
+    }
+
+    /**
+     * Search clients via AJAX
+     *
+     * @return  void
+     */
+    public function searchClients()
+    {
+        $app = Factory::getApplication();
+        $input = $app->input;
+        
+        // Set JSON response
+        $app->getDocument()->setMimeEncoding('application/json');
+        
+        $search = $input->getString('search', '');
+        
+        if (empty($search) || strlen($search) < 2) {
+            echo json_encode(['clients' => []]);
+            $app->close();
+        }
+        
+        try {
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $clients = $helper->getClients($search);
+            
+            echo json_encode(['clients' => $clients]);
+        } catch (Exception $e) {
+            echo json_encode(['clients' => [], 'error' => $e->getMessage()]);
+        }
+        
+        $app->close();
+    }
+
+    /**
+     * Create quote line via AJAX
+     *
+     * @return  void
+     */
+    public function createLine()
+    {
+        $app = Factory::getApplication();
+        $input = $app->input;
+        
+        // Set JSON response
+        $app->getDocument()->setMimeEncoding('application/json');
+        
+        $quoteId = $input->getInt('quote_id');
+        $productName = $input->getString('product_name');
+        $description = $input->getString('description');
+        $quantity = $input->getFloat('quantity');
+        $price = $input->getFloat('price');
+        
+        if (!$quoteId || !$productName || !$description || !$quantity || !$price) {
+            echo json_encode(['success' => false, 'message' => 'Missing required parameters']);
+            $app->close();
+        }
+        
+        try {
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $lineId = $helper->createQuoteLine($quoteId, $productName, $description, $quantity, $price);
+            
+            if ($lineId) {
+                echo json_encode(['success' => true, 'line_id' => $lineId]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to create quote line']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        
+        $app->close();
     }
 
     /**
