@@ -111,6 +111,27 @@ class CotizacionModel extends AdminModel
     }
 
     /**
+     * Method to get quote lines for a quote.
+     *
+     * @param   integer  $quoteId  The quote ID.
+     *
+     * @return  array    Array of quote lines.
+     */
+    public function getQuoteLines($quoteId)
+    {
+        if ($quoteId <= 0) {
+            return [];
+        }
+
+        try {
+            $helper = new OdooHelper();
+            return $helper->getQuoteLines($quoteId);
+        } catch (Exception $e) {
+            Factory::getApplication()->enqueueMessage('Error loading quote lines: ' . $e->getMessage(), 'warning');
+            return [];
+        }
+    }
+    /**
      * Method to create a new quote in Odoo.
      *
      * @param   array  $data  The quote data.

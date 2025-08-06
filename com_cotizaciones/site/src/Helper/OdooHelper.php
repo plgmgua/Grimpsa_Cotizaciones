@@ -194,6 +194,187 @@ class OdooHelper
     }
 
     /**
+     * Get quote lines for a specific quote
+     *
+     * @param   integer  $quoteId  The quote ID
+     *
+     * @return  array    Array of quote lines
+     */
+    public function getQuoteLines($quoteId)
+    {
+        try {
+            $lines = $this->odooCall('sale.order.line', 'search_read',
+                [['order_id', '=', $quoteId]],
+                ['id', 'product_id', 'name', 'product_uom_qty', 'price_unit', 'price_subtotal'],
+                ['order' => 'id asc']
+            );
+
+            if ($lines === false || !is_array($lines)) {
+                return [];
+            }
+
+            $processedLines = [];
+            foreach ($lines as $line) {
+                if (!is_array($line)) {
+                    continue;
+                }
+
+                $processedLines[] = [
+                    'id' => isset($line['id']) ? $line['id'] : 0,
+                    'product_id' => $this->getProductId($line),
+                    'product_name' => $this->getProductName($line),
+                    'name' => isset($line['name']) ? $line['name'] : '',
+                    'product_uom_qty' => isset($line['product_uom_qty']) ? $line['product_uom_qty'] : 1,
+                    'price_unit' => isset($line['price_unit']) ? $line['price_unit'] : 0.00,
+                    'price_subtotal' => isset($line['price_subtotal']) ? $line['price_subtotal'] : 0.00
+                ];
+            }
+
+            return $processedLines;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error getting quote lines: ' . $e->getMessage(), 'error');
+            }
+            return [];
+        }
+    }
+
+    /**
+     * Update a quote line in Odoo
+     *
+     * @param   integer  $lineId      The line ID
+     * @param   string   $description Line description
+     * @param   float    $quantity    Quantity
+     * @param   float    $price       Unit price
+     *
+     * @return  boolean  True on success, false on failure
+     */
+    public function updateQuoteLine($lineId, $description, $quantity, $price)
+    {
+        try {
+            $updateData = [
+                'name' => $description,
+                'product_uom_qty' => (float) $quantity,
+                'price_unit' => (float) $price
+            ];
+
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order.line</string></value>
+      </param>
+      <param>
+         <value><string>write</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><array><data>
+               <value><int>' . $lineId . '</int></value>
+            </data></array></value>
+            <value><struct>';
+
+            foreach ($updateData as $key => $value) {
+                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
+                if (is_float($value)) {
+                    $xmlRequest .= '<value><double>' . $value . '</double></value>';
+                } else {
+                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
+                }
+                $xmlRequest .= '</member>';
+            }
+
+            $xmlRequest .= '</struct></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+            return $result !== false;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error updating quote line: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Delete a quote line from Odoo
+     *
+     * @param   integer  $lineId  The line ID
+     *
+     * @return  boolean  True on success, false on failure
+     */
+    public function deleteQuoteLine($lineId)
+    {
+        try {
+            $xmlRequest = '<?xml version="1.0"?>
+<methodCall>
+   <methodName>execute_kw</methodName>
+   <params>
+      <param>
+         <value><string>' . htmlspecialchars($this->database) . '</string></value>
+      </param>
+      <param>
+         <value><int>' . $this->userId . '</int></value>
+      </param>
+      <param>
+         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
+      </param>
+      <param>
+         <value><string>sale.order.line</string></value>
+      </param>
+      <param>
+         <value><string>unlink</string></value>
+      </param>
+      <param>
+         <value><array><data>
+            <value><array><data>
+               <value><int>' . $lineId . '</int></value>
+            </data></array></value>
+         </data></array></value>
+      </param>
+   </params>
+</methodCall>';
+
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
+            
+            if ($response === false) {
+                return false;
+            }
+
+            $result = $this->parseXmlResponse($response);
+            return $result !== false;
+
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error deleting quote line: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
      * Get list of clients/partners from Odoo
      *
      * @param   string  $search  Search term for client name
@@ -1243,5 +1424,57 @@ class OdooHelper
         
         // If no numbers found, return 0 for sorting
         return 0;
+    }
+
+    /**
+     * Safely get product ID from line data
+     *
+     * @param   array  $line  Line data
+     *
+     * @return  integer  Product ID
+     */
+    private function getProductId($line)
+    {
+        if (!isset($line['product_id'])) {
+            return 0;
+        }
+
+        $productId = $line['product_id'];
+        
+        // If it's an array [id, name], return the ID
+        if (is_array($productId) && count($productId) >= 1) {
+            return (int) $productId[0];
+        }
+        
+        // If it's a direct integer
+        if (is_numeric($productId)) {
+            return (int) $productId;
+        }
+        
+        return 0;
+    }
+
+    /**
+     * Safely get product name from line data
+     *
+     * @param   array  $line  Line data
+     *
+     * @return  string  Product name
+     */
+    private function getProductName($line)
+    {
+        if (!isset($line['product_id'])) {
+            return 'Producto no disponible';
+        }
+
+        $productId = $line['product_id'];
+        
+        // If it's an array [id, name], return the name
+        if (is_array($productId) && count($productId) >= 2) {
+            return (string) $productId[1];
+        }
+        
+        // If it's just an ID, we don't have the name
+        return 'Producto ID: ' . $productId;
     }
 }

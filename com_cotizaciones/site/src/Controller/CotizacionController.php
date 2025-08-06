@@ -201,6 +201,38 @@ class CotizacionController extends FormController
     }
 
     /**
+     * Get quote lines via AJAX
+     *
+     * @return  void
+     */
+    public function getLines()
+    {
+        $app = Factory::getApplication();
+        $input = $app->input;
+        
+        // Set JSON response
+        $app->getDocument()->setMimeEncoding('application/json');
+        
+        $quoteId = $input->getInt('quote_id');
+        
+        if (!$quoteId) {
+            echo json_encode(['success' => false, 'message' => 'Missing quote ID']);
+            $app->close();
+        }
+        
+        try {
+            $model = $this->getModel('Cotizacion');
+            $lines = $model->getQuoteLines($quoteId);
+            
+            echo json_encode(['success' => true, 'lines' => $lines]);
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        
+        $app->close();
+    }
+
+    /**
      * Method to cancel an operation
      *
      * @param   string  $key  The name of the primary key of the URL variable.

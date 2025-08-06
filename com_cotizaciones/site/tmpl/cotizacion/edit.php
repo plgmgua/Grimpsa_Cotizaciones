@@ -571,16 +571,163 @@ function createQuoteLineInOdoo(quoteId, productName, description, quantity, pric
     });
 }
 
+function editQuoteLine(lineId) {
+    const line = quoteLines.find(l => l.id === lineId);
+    if (!line) return;
+    
+    // Create edit form inline
+    const row = document.querySelector(`tr[data-line-id="${lineId}"]`);
+    if (!row) return;
+    
+    const originalContent = row.innerHTML;
+    
+    row.innerHTML = `
+        <td>
+            <strong>${escapeHtml(line.name)}</strong>
+            <br><textarea class="form-control form-control-sm" id="edit-description-${lineId}" rows="2">${escapeHtml(line.description)}</textarea>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" id="edit-quantity-${lineId}" value="${line.quantity}" min="1" step="1">
+        </td>
+        <td>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text">Q</span>
+                <input type="number" class="form-control" id="edit-price-${lineId}" value="${line.price}" step="0.01" min="0">
+            </div>
+        </td>
+        <td class="currency-amount" id="edit-subtotal-${lineId}">Q ${line.subtotal.toFixed(2)}</td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-success" onclick="saveQuoteLineEdit(${lineId})">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="cancelQuoteLineEdit(${lineId}, \`${originalContent.replace(/`/g, '\\`')}\`)">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </td>
+    `;
+    
+    // Update subtotal on quantity/price change
+    const quantityInput = document.getElementById(`edit-quantity-${lineId}`);
+    const priceInput = document.getElementById(`edit-price-${lineId}`);
+    const subtotalSpan = document.getElementById(`edit-subtotal-${lineId}`);
+    
+    function updateSubtotal() {
+        const qty = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const subtotal = qty * price;
+        subtotalSpan.textContent = 'Q ' + subtotal.toFixed(2);
+    }
+    
+    quantityInput.addEventListener('input', updateSubtotal);
+    priceInput.addEventListener('input', updateSubtotal);
+}
+
+function saveQuoteLineEdit(lineId) {
+    const description = document.getElementById(`edit-description-${lineId}`).value.trim();
+    const quantity = parseFloat(document.getElementById(`edit-quantity-${lineId}`).value) || 1;
+    const price = parseFloat(document.getElementById(`edit-price-${lineId}`).value) || 0;
+    
+    if (!description || quantity <= 0 || price <= 0) {
+        alert('Por favor complete todos los campos correctamente');
+        return;
+    }
+    
+    const line = quoteLines.find(l => l.id === lineId);
+    if (!line) return;
+    
+    // Update line data
+    line.description = description;
+    line.quantity = quantity;
+    line.price = price;
+    line.subtotal = quantity * price;
+    
+    // Update in Odoo if it has an odoo_id
+    if (line.odoo_id) {
+        updateQuoteLineInOdoo(line.odoo_id, description, quantity, price, lineId);
+    } else {
+        // Refresh table
+        updateQuoteLinesTable();
+        showSuccessMessage('Línea actualizada exitosamente');
+    }
+}
+
+function cancelQuoteLineEdit(lineId, originalContent) {
+    const row = document.querySelector(`tr[data-line-id="${lineId}"]`);
+    if (row) {
+        row.innerHTML = originalContent;
+    }
+}
+
+function updateQuoteLineInOdoo(odooLineId, description, quantity, price, localLineId) {
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.updateLine&format=json'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: `line_id=${odooLineId}&description=${encodeURIComponent(description)}&quantity=${quantity}&price=${price}&<?php echo Session::getFormToken(); ?>=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateQuoteLinesTable();
+            showSuccessMessage('Línea actualizada exitosamente en Odoo');
+        } else {
+            alert('Error al actualizar la línea en Odoo: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating line:', error);
+        alert('Error de conexión al actualizar la línea');
+    });
+}
+
 function removeQuoteLine(lineId) {
     if (confirm('¿Está seguro de que desea eliminar esta línea?')) {
-        quoteLines = quoteLines.filter(line => line.id !== lineId);
-        updateQuoteLinesTable();
+        const line = quoteLines.find(l => l.id === lineId);
+        if (!line) return;
+        
+        // Delete from Odoo if it has an odoo_id
+        if (line.odoo_id) {
+            deleteQuoteLineFromOdoo(line.odoo_id, lineId);
+        } else {
+            // Just remove locally
+            quoteLines = quoteLines.filter(line => line.id !== lineId);
+            updateQuoteLinesTable();
+            showSuccessMessage('Línea eliminada exitosamente');
+        }
     }
+}
+
+function deleteQuoteLineFromOdoo(odooLineId, localLineId) {
+    fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.deleteLine&format=json'); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: `line_id=${odooLineId}&<?php echo Session::getFormToken(); ?>=1`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            quoteLines = quoteLines.filter(line => line.id !== localLineId);
+            updateQuoteLinesTable();
+            showSuccessMessage('Línea eliminada exitosamente de Odoo');
+        } else {
+            alert('Error al eliminar la línea de Odoo: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting line:', error);
+        alert('Error de conexión al eliminar la línea');
+    });
 }
 
 function updateQuoteLinesTable() {
     const tbody = document.getElementById('quote-lines-tbody');
-    const noLinesRow = document.getElementById('no-lines-row');
     
     if (quoteLines.length === 0) {
         tbody.innerHTML = '<tr id="no-lines-row"><td colspan="5" class="text-center text-muted"><i class="fas fa-info-circle"></i> No hay líneas agregadas. Use el formulario de arriba para agregar productos.</td></tr>';
@@ -594,7 +741,7 @@ function updateQuoteLinesTable() {
     quoteLines.forEach(line => {
         total += line.subtotal;
         html += `
-            <tr>
+            <tr data-line-id="${line.id}">
                 <td>
                     <strong>${escapeHtml(line.name)}</strong>
                     <br><small class="text-muted">${escapeHtml(line.description)}</small>
@@ -603,9 +750,14 @@ function updateQuoteLinesTable() {
                 <td>Q ${line.price.toFixed(2)}</td>
                 <td class="currency-amount">Q ${line.subtotal.toFixed(2)}</td>
                 <td>
-                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeQuoteLine(${line.id})">
-                        <i class="fas fa-trash"></i> Eliminar
-                    </button>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(${line.id})" title="Editar línea">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(${line.id})" title="Eliminar línea">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `;
