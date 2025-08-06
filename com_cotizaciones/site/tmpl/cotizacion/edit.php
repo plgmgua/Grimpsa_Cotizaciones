@@ -177,11 +177,11 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
     </form>
 
     <!-- Quote Lines Section - Only show if quote has been created -->
-    <?php if (!empty($this->item->id) && $this->item->id > 0 && !empty($this->item->name)): ?>
+    <?php if (safeProperty($this->item, 'id', 0) > 0 && !empty(safeProperty($this->item, 'name', ''))): ?>
         <?php
         // Load existing quote lines
         $model = $this->getModel();
-        $existingLines = $model->getQuoteLines($this->item->id);
+        $existingLines = $model->getQuoteLines(safeProperty($this->item, 'id', 0));
         ?>
         
         <div class="row mt-4">
