@@ -555,22 +555,33 @@ class OdooHelper
                 ['offset' => $offset, 'limit' => $limit, 'order' => 'date_order desc']
             );
 
-            if (!$quotes || !is_array($quotes)) {
+            if ($quotes === false || !is_array($quotes)) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('No quotes returned from Odoo or invalid response format', 'warning');
+                }
                 return $this->getMockQuotes($search);
             }
 
             // Process the quotes to add contact names
             $processedQuotes = [];
             foreach ($quotes as $quote) {
+                // Ensure $quote is an array before accessing
+                if (!is_array($quote)) {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Invalid quote format: ' . print_r($quote, true), 'warning');
+                    }
+                    continue;
+                }
+
                 $processedQuote = [
-                    'id' => $quote['id'],
-                    'name' => $quote['name'],
-                    'partner_id' => is_array($quote['partner_id']) ? $quote['partner_id'][0] : $quote['partner_id'],
-                    'contact_name' => is_array($quote['partner_id']) ? $quote['partner_id'][1] : 'Cliente no disponible',
-                    'date_order' => $quote['date_order'],
-                    'amount_total' => $quote['amount_total'],
-                    'state' => $quote['state'],
-                    'note' => $quote['note'] ?: ''
+                    'id' => isset($quote['id']) ? $quote['id'] : 0,
+                    'name' => isset($quote['name']) ? $quote['name'] : 'Sin número',
+                    'partner_id' => $this->getPartnerId($quote),
+                    'contact_name' => $this->getContactName($quote),
+                    'date_order' => isset($quote['date_order']) ? $quote['date_order'] : date('Y-m-d'),
+                    'amount_total' => isset($quote['amount_total']) ? $quote['amount_total'] : '0.00',
+                    'state' => isset($quote['state']) ? $quote['state'] : 'draft',
+                    'note' => isset($quote['note']) ? $quote['note'] : ''
                 ];
                 $processedQuotes[] = $processedQuote;
             }
@@ -588,6 +599,58 @@ class OdooHelper
     }
 
     /**
+     * Safely get partner ID from quote data
+     *
+     * @param   array  $quote  Quote data
+     *
+     * @return  integer  Partner ID
+     */
+    private function getPartnerId($quote)
+    {
+        if (!isset($quote['partner_id'])) {
+            return 0;
+        }
+
+        $partnerId = $quote['partner_id'];
+        
+        // If it's an array [id, name], return the ID
+        if (is_array($partnerId) && count($partnerId) >= 1) {
+            return (int) $partnerId[0];
+        }
+        
+        // If it's a direct integer
+        if (is_numeric($partnerId)) {
+            return (int) $partnerId;
+        }
+        
+        return 0;
+    }
+
+    /**
+     * Safely get contact name from quote data
+     *
+     * @param   array  $quote  Quote data
+     *
+     * @return  string  Contact name
+     */
+    private function getContactName($quote)
+    {
+        if (!isset($quote['partner_id'])) {
+            return 'Cliente no disponible';
+        }
+
+        $partnerId = $quote['partner_id'];
+        
+        // If it's an array [id, name], return the name
+        if (is_array($partnerId) && count($partnerId) >= 2) {
+            return (string) $partnerId[1];
+        }
+        
+        // If it's just an ID, we don't have the name
+        return 'Cliente ID: ' . $partnerId;
+    }
+
+    /**
      * Get a single quote
      *
      * @param   integer  $quoteId  The quote ID
@@ -602,21 +665,26 @@ class OdooHelper
                 ['id', 'name', 'partner_id', 'date_order', 'amount_total', 'state', 'note']
             );
 
-            if (!$quotes || !is_array($quotes) || empty($quotes)) {
+            if ($quotes === false || !is_array($quotes) || empty($quotes)) {
                 return false;
             }
 
             $quote = $quotes[0];
             
+            // Ensure $quote is an array
+            if (!is_array($quote)) {
+                return false;
+            }
+            
             return [
-                'id' => $quote['id'],
-                'name' => $quote['name'],
-                'partner_id' => is_array($quote['partner_id']) ? $quote['partner_id'][0] : $quote['partner_id'],
-                'contact_name' => is_array($quote['partner_id']) ? $quote['partner_id'][1] : 'Cliente no disponible',
-                'date_order' => $quote['date_order'],
-                'amount_total' => $quote['amount_total'],
-                'state' => $quote['state'],
-                'note' => $quote['note'] ?: ''
+                'id' => isset($quote['id']) ? $quote['id'] : 0,
+                'name' => isset($quote['name']) ? $quote['name'] : 'Sin número',
+                'partner_id' => $this->getPartnerId($quote),
+                'contact_name' => $this->getContactName($quote),
+                'date_order' => isset($quote['date_order']) ? $quote['date_order'] : date('Y-m-d'),
+                'amount_total' => isset($quote['amount_total']) ? $quote['amount_total'] : '0.00',
+                'state' => isset($quote['state']) ? $quote['state'] : 'draft',
+                'note' => isset($quote['note']) ? $quote['note'] : ''
             ];
 
         } catch (Exception $e) {

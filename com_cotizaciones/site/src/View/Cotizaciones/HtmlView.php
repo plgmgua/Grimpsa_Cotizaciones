@@ -79,6 +79,11 @@ class HtmlView extends BaseHtmlView
             $this->state = $this->get('State');
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
+            // Ensure items is always an array
+            if (!is_array($this->items)) {
+                $this->items = [];
+            }
+            
             // Test Odoo connection and show detailed status
             $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
             
@@ -91,11 +96,11 @@ class HtmlView extends BaseHtmlView
                 // Add debug info if debug mode is enabled
                 if ($this->params->get('enable_debug', 0)) {
                     $message .= '<br><strong>Debug Info:</strong><br>';
-                    $message .= 'URL: ' . $connectionStatus['url'] . '<br>';
-                    $message .= 'Database: ' . $connectionStatus['database'] . '<br>';
-                    $message .= 'User ID: ' . $connectionStatus['user_id'] . '<br>';
-                    $message .= 'API Key Set: ' . ($connectionStatus['api_key_set'] ? 'Yes' : 'No') . '<br>';
-                    $message .= 'cURL Available: ' . ($connectionStatus['curl_available'] ? 'Yes' : 'No') . '<br>';
+                    $message .= 'URL: ' . (isset($connectionStatus['url']) ? $connectionStatus['url'] : 'N/A') . '<br>';
+                    $message .= 'Database: ' . (isset($connectionStatus['database']) ? $connectionStatus['database'] : 'N/A') . '<br>';
+                    $message .= 'User ID: ' . (isset($connectionStatus['user_id']) ? $connectionStatus['user_id'] : 'N/A') . '<br>';
+                    $message .= 'API Key Set: ' . (isset($connectionStatus['api_key_set']) && $connectionStatus['api_key_set'] ? 'Yes' : 'No') . '<br>';
+                    $message .= 'cURL Available: ' . (isset($connectionStatus['curl_available']) && $connectionStatus['curl_available'] ? 'Yes' : 'No') . '<br>';
                     if (!empty($connectionStatus['error_message'])) {
                         $message .= 'Error: ' . $connectionStatus['error_message'];
                     }
@@ -111,12 +116,14 @@ class HtmlView extends BaseHtmlView
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
             // Log the error for debugging
-            Factory::getApplication()->enqueueMessage($e->getMessage(), 'error');
+            Factory::getApplication()->enqueueMessage('Error loading quotes: ' . $e->getMessage(), 'error');
         }
 
         // Check for errors.
         if (count($errors = $this->get('Errors'))) {
-            Factory::getApplication()->enqueueMessage(implode("\n", $errors), 'error');
+            foreach ($errors as $error) {
+                Factory::getApplication()->enqueueMessage('Model error: ' . $error, 'error');
+            }
             $this->items = [];
             $this->pagination = null;
             $this->state = new \Joomla\Registry\Registry();
