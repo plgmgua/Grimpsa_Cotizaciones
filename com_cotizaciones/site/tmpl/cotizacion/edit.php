@@ -271,7 +271,7 @@ $user = Factory::getUser();
                                                 $subtotal = $line['product_uom_qty'] * $line['price_unit'];
                                                 $total += $subtotal;
                                             ?>
-                                            <tr data-line-id="<?php echo $line['id']; ?>" data-odoo-id="<?php echo $line['id']; ?>" id="line-row-<?php echo $line['id']; ?>">
+                                            <tr data-line-id="<?php echo $line['id']; ?>" data-odoo-id="<?php echo $line['id']; ?>" id="line-row-<?php echo $line['id']; ?>" data-original-description="<?php echo htmlspecialchars($line['name']); ?>" data-original-quantity="<?php echo $line['product_uom_qty']; ?>" data-original-price="<?php echo $line['price_unit']; ?>">
                                                 <td>
                                                     <strong><?php echo htmlspecialchars($line['product_name']); ?></strong>
                                                     <br><small class="text-muted"><?php echo htmlspecialchars($line['name']); ?></small>
@@ -281,10 +281,10 @@ $user = Factory::getUser();
                                                 <td class="currency-amount">Q <?php echo number_format($subtotal, 2); ?></td>
                                                 <td>
                                                     <div class="btn-group btn-group-sm">
-                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea" id="edit-btn-<?php echo $line['id']; ?>">
+                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea" id="edit-btn-<?php echo $line['id']; ?>" data-line-id="<?php echo $line['id']; ?>">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
-                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea" id="delete-btn-<?php echo $line['id']; ?>">
+                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea" id="delete-btn-<?php echo $line['id']; ?>" data-line-id="<?php echo $line['id']; ?>">
                                                             <i class="fas fa-trash"></i>
                                                         </button>
                                                     </div>
@@ -331,11 +331,10 @@ $user = Factory::getUser();
                                 <i class="fas fa-save"></i> Crear Cotización
                             </button>
                         <?php else: ?>
-                            <button type="button" class="btn btn-success" onclick="saveQuote()">
+                            <button type="button" class="btn btn-success btn-lg" onclick="saveQuote()">
                                 <i class="fas fa-save"></i> Guardar Cambios
                             </button>
                         <?php endif; ?>
-                        </button>
                     </div>
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-secondary" onclick="cancelQuote()">
@@ -628,53 +627,53 @@ function createQuoteLineInOdoo(quoteId, productName, description, quantity, pric
 function editQuoteLine(lineId) {
     console.log('Editing line ID:', lineId);
     
-    // Find line by id or odoo_id
-        console.error('Line not found:', lineId);
-        alert('Error: No se pudo encontrar la línea para editar');
-    const line = quoteLines.find(l => l.id === lineId || l.odoo_id === lineId);
-    if (!line) return;
-    
-    console.log('Found line:', line);
-    
     // Find the table row
+    const row = document.getElementById(`line-row-${lineId}`);
+    if (!row) {
         console.error('Row not found for line ID:', lineId);
         alert('Error: No se pudo encontrar la fila para editar');
-    const row = document.getElementById(`line-row-${lineId}`);
-    if (!row) return;
+        return;
+    }
     
     console.log('Found row:', row);
     
-    const originalContent = row.innerHTML;
+    // Get original data from row attributes
+    const originalDescription = row.getAttribute('data-original-description') || '';
+    const originalQuantity = parseFloat(row.getAttribute('data-original-quantity')) || 1;
+    const originalPrice = parseFloat(row.getAttribute('data-original-price')) || 0;
+    const productName = row.querySelector('strong').textContent || 'Producto';
+    
+    // Store original content for cancel
+    if (!row.hasAttribute('data-original-content')) {
+        row.setAttribute('data-original-content', row.innerHTML);
+    }
     
     row.innerHTML = `
         <td>
-            <strong>${escapeHtml(line.name || 'Producto')}</strong>
-            <br><textarea class="form-control form-control-sm" id="edit-description-${lineId}" rows="2">${escapeHtml(line.description)}</textarea>
+            <strong>${escapeHtml(productName)}</strong>
+            <br><textarea class="form-control form-control-sm" id="edit-description-${lineId}" rows="2" placeholder="Descripción del producto...">${escapeHtml(originalDescription)}</textarea>
         </td>
         <td>
-            <input type="number" class="form-control form-control-sm" id="edit-quantity-${lineId}" value="${line.quantity}" min="1" step="1">
+            <input type="number" class="form-control form-control-sm" id="edit-quantity-${lineId}" value="${originalQuantity}" min="1" step="1">
         </td>
         <td>
             <div class="input-group input-group-sm">
                 <span class="input-group-text">Q</span>
-                <input type="number" class="form-control" id="edit-price-${lineId}" value="${line.price}" step="0.01" min="0">
+                <input type="number" class="form-control" id="edit-price-${lineId}" value="${originalPrice}" step="0.01" min="0">
             </div>
         </td>
-        <td class="currency-amount" id="edit-subtotal-${lineId}">Q ${line.subtotal.toFixed(2)}</td>
+        <td class="currency-amount" id="edit-subtotal-${lineId}">Q ${(originalQuantity * originalPrice).toFixed(2)}</td>
         <td>
             <div class="btn-group btn-group-sm">
                 <button type="button" class="btn btn-success" onclick="saveQuoteLineEdit(${lineId})">
-                    <i class="fas fa-save"></i> Guardar
+                    <i class="fas fa-save"></i>
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="cancelQuoteLineEdit(${lineId})">
-                    <i class="fas fa-times"></i> Cancelar
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
         </td>
     `;
-    
-    // Store original content for cancel
-    row.setAttribute('data-original-content', originalContent);
     
     // Update subtotal on quantity/price change
     const quantityInput = document.getElementById(`edit-quantity-${lineId}`);
@@ -691,7 +690,8 @@ function editQuoteLine(lineId) {
     quantityInput.addEventListener('input', updateSubtotal);
     priceInput.addEventListener('input', updateSubtotal);
     
-    console.log('Edit form created successfully');
+    // Focus on description field
+    document.getElementById(`edit-description-${lineId}`).focus();
 }
 
 function saveQuoteLineEdit(lineId) {
@@ -701,28 +701,22 @@ function saveQuoteLineEdit(lineId) {
     const quantity = parseFloat(document.getElementById(`edit-quantity-${lineId}`).value) || 1;
     const price = parseFloat(document.getElementById(`edit-price-${lineId}`).value) || 0;
     
+    // Validation
     if (!description || quantity <= 0 || price <= 0) {
         alert('Por favor complete todos los campos correctamente');
         return;
     }
     
-    const line = quoteLines.find(l => l.id === lineId || l.odoo_id === lineId);
-    if (!line) return;
-    
-    // Update line data
-    line.description = description;
-    line.quantity = quantity;
-    line.price = price;
-    line.subtotal = quantity * price;
-    
-    // Update in Odoo if it has an odoo_id
-    if (line.odoo_id) {
-        updateQuoteLineInOdoo(line.odoo_id, description, quantity, price, lineId);
-    } else {
-        // Refresh table
-        updateQuoteLinesTable();
-        showSuccessMessage('Línea actualizada exitosamente');
+    // Show loading state
+    const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
+    if (saveBtn) {
+        const originalText = saveBtn.innerHTML;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        saveBtn.disabled = true;
     }
+    
+    // Update in Odoo
+    updateQuoteLineInOdoo(lineId, description, quantity, price);
 }
 
 function cancelQuoteLineEdit(lineId) {
@@ -741,14 +735,6 @@ function cancelQuoteLineEdit(lineId) {
 function updateQuoteLineInOdoo(lineId, description, quantity, price) {
     console.log('Updating line in Odoo:', lineId, description, quantity, price);
     
-    // Show loading state
-    const saveBtn = document.querySelector(`button[onclick="saveQuoteLineEdit(${lineId})"]`);
-    if (saveBtn) {
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
-        saveBtn.disabled = true;
-    }
-    
     fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.updateLine&format=json'); ?>', {
         method: 'POST',
         headers: {
@@ -761,26 +747,18 @@ function updateQuoteLineInOdoo(lineId, description, quantity, price) {
     .then(data => {
         console.log('Update response:', data);
         if (data.success) {
-            // Refresh the page to reload lines from Odoo
-            location.reload();
             showSuccessMessage('Línea actualizada exitosamente en Odoo');
+            // Refresh the page to reload lines from Odoo
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } else {
             alert('Error al actualizar la línea en Odoo: ' + data.message);
-            // Restore button state
-            if (saveBtn) {
-                saveBtn.innerHTML = originalText;
-                saveBtn.disabled = false;
-            }
         }
     })
     .catch(error => {
         console.error('Error updating line:', error);
         alert('Error de conexión al actualizar la línea');
-        // Restore button state
-        if (saveBtn) {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
     });
 }
 
@@ -790,6 +768,14 @@ function removeQuoteLine(lineId) {
     if (confirm('¿Está seguro de que desea eliminar esta línea?')) {
         console.log('User confirmed deletion');
         
+        // Show loading state
+        const deleteBtn = document.getElementById(`delete-btn-${lineId}`);
+        if (deleteBtn) {
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            deleteBtn.disabled = true;
+        }
+        
         // Delete from Odoo
         deleteQuoteLineFromOdoo(lineId);
     }
@@ -797,14 +783,6 @@ function removeQuoteLine(lineId) {
 
 function deleteQuoteLineFromOdoo(lineId) {
     console.log('Deleting line from Odoo:', lineId);
-    
-    // Show loading state
-    const deleteBtn = document.getElementById(`delete-btn-${lineId}`);
-    if (deleteBtn) {
-        const originalText = deleteBtn.innerHTML;
-        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-        deleteBtn.disabled = true;
-    }
     
     fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.deleteLine&format=json'); ?>', {
         method: 'POST',
@@ -818,26 +796,18 @@ function deleteQuoteLineFromOdoo(lineId) {
     .then(data => {
         console.log('Delete response:', data);
         if (data.success) {
-            // Refresh the page to reload lines from Odoo
-            location.reload();
             showSuccessMessage('Línea eliminada exitosamente de Odoo');
+            // Refresh the page to reload lines from Odoo
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } else {
             alert('Error al eliminar la línea de Odoo: ' + data.message);
-            // Restore button state
-            if (deleteBtn) {
-                deleteBtn.innerHTML = originalText;
-                deleteBtn.disabled = false;
-            }
         }
     })
     .catch(error => {
         console.error('Error deleting line:', error);
         alert('Error de conexión al eliminar la línea');
-        // Restore button state
-        if (deleteBtn) {
-            deleteBtn.innerHTML = originalText;
-            deleteBtn.disabled = false;
-        }
     });
 }
 
