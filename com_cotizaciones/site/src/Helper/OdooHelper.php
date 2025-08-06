@@ -826,149 +826,22 @@ class OdooHelper
       <param>
          <value><string>' . htmlspecialchars($this->database) . '</string></value>
       </param>
-      <param>
-         <value><int>' . $this->userId . '</int></value>
-      </param>
-      <param>
-         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
-      </param>
-      <param>
-         <value><string>sale.order</string></value>
-      </param>
-      <param>
-         <value><string>write</string></value>
-      </param>
-      <param>
-         <value><array><data>
-            <value><array><data>
-    }
-
-    /**
-     * Test Odoo connection
-     *
-     * @return  boolean  True if connection works
-     */
-    public function testConnection()
-    {
-        $test = $this->testOdooApiCall();
-        return $test['success'];
-    }
-
-    /**
-     * Get detailed connection status for debugging
-     *
-     * @return  array  Connection status details
-     */
-    public function getConnectionStatus()
-    {
-        $status = [
-            'url' => $this->url,
-            'database' => $this->database,
-            'user_id' => $this->userId,
-            'api_key_set' => !empty($this->apiKey),
-            'curl_available' => function_exists('curl_init'),
-            'connection_test' => false,
-            'authentication_test' => false,
-            'uid' => $this->userId,
-            'error_message' => ''
-        ];
-
-        try {
-            // Test the API call
-            $apiTest = $this->testOdooApiCall();
-            $status['connection_test'] = $apiTest['success'];
-            $status['authentication_test'] = $apiTest['success'];
+            $response = $this->makeCurlRequest($this->url, $xmlRequest);
             
-            if (!$apiTest['success']) {
-                $status['error_message'] = $apiTest['error'];
+            if ($response === false) {
+                return false;
             }
 
+            $result = $this->parseXmlResponse($response);
+
+            return $result !== false;
+
         } catch (Exception $e) {
-            $status['error_message'] = $e->getMessage();
-        }
-
-        return $status;
-    }
-
-    /**
-     * Check if a quote number is valid
-     *
-     * @param   string  $quoteName  The quote name/number to validate
-     *
-     * @return  boolean  True if valid, false otherwise
-     */
-    private function isValidQuoteNumber($quoteName)
-    {
-        // Convert to string and trim
-        $quoteName = trim((string) $quoteName);
-        
-        // Check if empty
-        if (empty($quoteName)) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error updating quote: ' . $e->getMessage(), 'error');
+            }
             return false;
         }
-        
-        // Convert to lowercase for case-insensitive comparison
-        $lowerName = strtolower($quoteName);
-        
-        // List of invalid values
-        $invalidValues = [
-            'sin número',
-            'sin numero',
-            'new',
-            'draft',
-            'borrador',
-            'false',
-            'none',
-            'null',
-            'undefined'
-        ];
-        
-        // Check against invalid values
-        if (in_array($lowerName, $invalidValues)) {
-            return false;
-        }
-        
-        // Must be at least 3 characters
-        if (strlen($quoteName) < 3) {
-            return false;
-        }
-        
-        // Must contain at least one letter or number
-        if (!preg_match('/[a-zA-Z0-9]/', $quoteName)) {
-            return false;
-        }
-        
-        // Valid quote number
-        return true;
-    }
-
-    /**
-     * Extract numeric part from quote number for sorting
-     *
-     * @param   string  $quoteName  The quote name/number
-     *
-     * @return  integer  The numeric part for sorting
-     */
-    private function extractQuoteNumber($quoteName)
-    {
-        // Convert to string and trim
-        $quoteName = trim((string) $quoteName);
-        
-        // Extract all numbers from the quote name
-        preg_match_all('/\d+/', $quoteName, $matches);
-        
-        if (!empty($matches[0])) {
-            // Use the last (usually largest) number found
-            $numbers = $matches[0];
-            return (int) end($numbers);
-        }
-        
-        // If no numbers found, return 0 for sorting
-        return 0;
-    }
-}
-
-        return array_values($mockQuotes);
     }
 
     /**
