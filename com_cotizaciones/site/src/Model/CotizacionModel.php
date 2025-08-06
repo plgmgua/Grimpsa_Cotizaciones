@@ -77,6 +77,7 @@ class CotizacionModel extends AdminModel
             'id' => $pk,
             'name' => '',
             'partner_id' => 0,
+            'contact_name' => '',
             'date_order' => date('Y-m-d'),
             'amount_total' => '0.00',
             'state' => 'draft',

@@ -68,48 +68,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                         <div class="card-body">
                             <!-- First Row: All basic fields -->
                             <div class="row">
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="jform_name" class="form-label">
-                                            Número de Cotización
-                                        </label>
-                                        <input type="text" name="jform[name]" id="jform_name" 
-                                               value="<?php echo htmlspecialchars($this->item->name ?? ''); ?>" 
-                                               class="form-control" readonly />
-                                        <small class="form-text text-muted">
-                                            <?php if (empty($this->item->name) || $this->item->name === ''): ?>
-                                                Se generará automáticamente al guardar
-                                            <?php else: ?>
-                                                Generado automáticamente por Odoo
-                                            <?php endif; ?>
-                                        </small>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="jform_date_order" class="form-label">
-                                            Fecha de Cotización *
-                                        </label>
-                                        <input type="date" name="jform[date_order]" id="jform_date_order" 
-                                               value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
-                                               class="form-control required" required />
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label for="jform_amount_total" class="form-label">
-                                            Total
-                                        </label>
-                                        <div class="input-group">
-                                            <span class="input-group-text">Q</span>
-                                            <input type="text" name="jform[amount_total]" id="jform_amount_total" 
-                                                   value="<?php echo htmlspecialchars($this->item->amount_total ?? '0.00'); ?>" 
-                                                   class="form-control" readonly />
-                                        </div>
-                                        <small class="form-text text-muted">Se calcula automáticamente</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         <?php if ($isNew): ?>
                                             <label for="client_search" class="form-label">
@@ -144,6 +103,33 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                    value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" />
                                             <small class="form-text text-muted">El cliente no se puede cambiar una vez creada la cotización</small>
                                         <?php endif; ?>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="jform_date_order" class="form-label">
+                                            Fecha de Cotización *
+                                        </label>
+                                        <input type="date" name="jform[date_order]" id="jform_date_order" 
+                                               value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
+                                               class="form-control required" required />
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="jform_name" class="form-label">
+                                            Número de Cotización
+                                        </label>
+                                        <input type="text" name="jform[name]" id="jform_name" 
+                                               value="<?php echo htmlspecialchars($this->item->name ?? ''); ?>" 
+                                               class="form-control" readonly />
+                                        <small class="form-text text-muted">
+                                            <?php if (empty($this->item->name) || $this->item->name === ''): ?>
+                                                Se generará automáticamente al guardar
+                                            <?php else: ?>
+                                                Generado automáticamente por Odoo
+                                            <?php endif; ?>
+                                        </small>
                                     </div>
                                 </div>
                             </div>

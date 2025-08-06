@@ -65,12 +65,27 @@ class HtmlView extends BaseHtmlView
             $this->form = $this->get('Form');
             $this->item = $this->get('Item');
             $this->state = $this->get('State');
+            
+            // Ensure item is always an object with required properties
+            if (!is_object($this->item)) {
+                $this->item = (object) [
+                    'id' => 0,
+                    'name' => '',
+                    'partner_id' => 0,
+                    'contact_name' => '',
+                    'date_order' => date('Y-m-d'),
+                    'amount_total' => '0.00',
+                    'state' => 'draft',
+                    'note' => ''
+                ];
+            }
         } catch (Exception $e) {
             // If there's an error, create a default empty item
             $this->item = (object) [
                 'id' => 0,
                 'name' => '',
                 'partner_id' => 0,
+                'contact_name' => '',
                 'date_order' => date('Y-m-d'),
                 'amount_total' => '0.00',
                 'state' => 'draft',
