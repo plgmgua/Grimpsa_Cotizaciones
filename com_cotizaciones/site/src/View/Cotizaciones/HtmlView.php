@@ -84,30 +84,6 @@ class HtmlView extends BaseHtmlView
                 $this->items = [];
             }
             
-            // Test Odoo connection and show detailed status
-            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-            
-            // Get connection status for debugging
-            $connectionStatus = $helper->getConnectionStatus();
-            
-            if (!$connectionStatus['connection_test']) {
-                $message = 'Advertencia: No se pudo conectar con Odoo. Mostrando datos de ejemplo.';
-                
-                // Add debug info if debug mode is enabled
-                if ($this->params->get('enable_debug', 0)) {
-                    $message .= '<br><strong>Debug Info:</strong><br>';
-                    $message .= 'URL: ' . (isset($connectionStatus['url']) ? $connectionStatus['url'] : 'N/A') . '<br>';
-                    $message .= 'Database: ' . (isset($connectionStatus['database']) ? $connectionStatus['database'] : 'N/A') . '<br>';
-                    $message .= 'User ID: ' . (isset($connectionStatus['user_id']) ? $connectionStatus['user_id'] : 'N/A') . '<br>';
-                    $message .= 'API Key Set: ' . (isset($connectionStatus['api_key_set']) && $connectionStatus['api_key_set'] ? 'Yes' : 'No') . '<br>';
-                    $message .= 'cURL Available: ' . (isset($connectionStatus['curl_available']) && $connectionStatus['curl_available'] ? 'Yes' : 'No') . '<br>';
-                    if (!empty($connectionStatus['error_message'])) {
-                        $message .= 'Error: ' . $connectionStatus['error_message'];
-                    }
-                }
-                
-                Factory::getApplication()->enqueueMessage($message, 'warning');
-            }
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults
             $this->items = [];

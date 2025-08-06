@@ -144,15 +144,6 @@ function getStateLabel($state) {
             </div>
         <?php endif; ?>
         
-        <!-- Diagnostics Link -->
-        <div class="row mt-2">
-            <div class="col-12 text-end">
-                <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones&layout=diagnostics'); ?>" 
-                   class="btn btn-sm btn-outline-info">
-                    <i class="fas fa-stethoscope"></i> Diagnóstico de Conexión
-                </a>
-            </div>
-        </div>
     </div>
 
     <!-- Quotes Table -->
