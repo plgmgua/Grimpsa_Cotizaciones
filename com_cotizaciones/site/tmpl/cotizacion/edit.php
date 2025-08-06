@@ -203,11 +203,12 @@ $user = Factory::getUser();
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <div class="mb-3">
-                                                    <label for="product_name" class="form-label">Nombre del Producto *</label>
-                                                    <input type="text" id="product_name" class="form-control" 
-                                                           value="" readonly 
-                                                           placeholder="Se generará automáticamente" />
-                                                    <small class="form-text text-muted">Se genera automáticamente como PROD-001, PROD-002, etc.</small>
+                                                    <label for="product_description" class="form-label">Descripción del Producto *</label>
+                                                    <textarea id="product_description" class="form-control" rows="3" 
+                                                              placeholder="Descripción detallada del producto o servicio..." required></textarea>
+                                                    <small class="form-text text-muted">
+                                                        Incluye especificaciones, materiales, dimensiones, etc.
+                                                    </small>
                                                 </div>
                                             </div>
                                             <div class="col-md-3">
@@ -225,18 +226,6 @@ $user = Factory::getUser();
                                                         <input type="number" id="product_price" class="form-control" 
                                                                step="0.01" min="0" placeholder="0.00" required />
                                                     </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-12">
-                                                <div class="mb-3">
-                                                    <label for="product_description" class="form-label">Descripción del Producto</label>
-                                                    <textarea id="product_description" class="form-control" rows="3" 
-                                                              placeholder="Descripción detallada del producto o servicio..." required></textarea>
-                                                    <small class="form-text text-muted">
-                                                        Incluye especificaciones, materiales, dimensiones, etc. (Requerido)
-                                                    </small>
                                                 </div>
                                             </div>
                                         </div>
@@ -482,13 +471,12 @@ function validateForm() {
 // Quote Lines Management
 let quoteLines = [];
 let lineCounter = 0;
-let productCounter = 1;
 
-// Generate next product name
+// Generate next product name based on quote number
 function generateProductName() {
-    const name = 'PROD-' + String(productCounter).padStart(3, '0');
-    productCounter++;
-    return name;
+    const quoteName = '<?php echo htmlspecialchars($this->item->name ?? ''); ?>';
+    const nextNumber = String(lineCounter + 1).padStart(2, '0');
+    return quoteName + '-' + nextNumber;
 }
 
 function addQuoteLine() {
@@ -517,7 +505,6 @@ function addQuoteLine() {
     
     // Generate product name
     const productName = generateProductName();
-    document.getElementById('product_name').value = productName;
     
     // Create line object
     const line = {
@@ -549,6 +536,12 @@ function addQuoteLine() {
 }
 
 function createQuoteLineInOdoo(quoteId, productName, description, quantity, price) {
+    // Show loading state
+    const addButton = document.querySelector('.btn-success[onclick="addQuoteLine()"]');
+    const originalText = addButton.innerHTML;
+    addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Agregando...';
+    addButton.disabled = true;
+    
     fetch('<?php echo Route::_('index.php?option=com_cotizaciones&task=cotizacion.createLine&format=json'); ?>', {
         method: 'POST',
         headers: {
@@ -562,11 +555,19 @@ function createQuoteLineInOdoo(quoteId, productName, description, quantity, pric
         if (!data.success) {
             console.error('Error creating line in Odoo:', data.message);
             alert('Error al crear la línea en Odoo: ' + data.message);
+        } else {
+            // Show success message
+            showSuccessMessage('Línea agregada exitosamente: ' + productName);
         }
     })
     .catch(error => {
         console.error('Error:', error);
         alert('Error de conexión al crear la línea');
+    })
+    .finally(() => {
+        // Restore button state
+        addButton.innerHTML = originalText;
+        addButton.disabled = false;
     });
 }
 
@@ -615,7 +616,6 @@ function updateQuoteLinesTable() {
 }
 
 function clearProductForm() {
-    document.getElementById('product_name').value = generateProductName();
     document.getElementById('product_quantity').value = '1';
     document.getElementById('product_price').value = '';
     document.getElementById('product_description').value = '';
@@ -625,5 +625,27 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Show success message
+function showSuccessMessage(message) {
+    // Create success alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        <i class="fas fa-check-circle"></i> ${escapeHtml(message)}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Insert at top of form
+    const formContainer = document.querySelector('.quote-form-container');
+    formContainer.insertBefore(alertDiv, formContainer.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
 }
 </script>
