@@ -13,6 +13,7 @@ use Joomla\CMS\HTML\HTMLHelper;
 use Joomla\CMS\Language\Text;
 use Joomla\CMS\Router\Route;
 use Joomla\CMS\Factory;
+use Joomla\CMS\Session\Session;
 
 HTMLHelper::_('bootstrap.framework');
 HTMLHelper::_('behavior.formvalidator');
