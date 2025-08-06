@@ -59,15 +59,16 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
         
         <div class="quote-form-container">
             <div class="row">
-                <!-- Basic Information -->
-                <div class="col-lg-8">
+                <!-- Basic Information - Full Width -->
+                <div class="col-12">
                     <div class="card">
                         <div class="card-header">
                             <h5 class="card-title mb-0">Información Básica</h5>
                         </div>
                         <div class="card-body">
+                            <!-- First Row: All basic fields -->
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="jform_name" class="form-label">
                                             Número de Cotización
@@ -84,7 +85,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                         </small>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-3">
                                     <div class="mb-3">
                                         <label for="jform_date_order" class="form-label">
                                             Fecha de Cotización *
@@ -94,10 +95,21 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                class="form-control required" required />
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-12">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="jform_amount_total" class="form-label">
+                                            Total
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">Q</span>
+                                            <input type="text" name="jform[amount_total]" id="jform_amount_total" 
+                                                   value="<?php echo htmlspecialchars($this->item->amount_total ?? '0.00'); ?>" 
+                                                   class="form-control" readonly />
+                                        </div>
+                                        <small class="form-text text-muted">Se calcula automáticamente</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
                                     <div class="mb-3">
                                         <?php if ($isNew): ?>
                                             <label for="client_search" class="form-label">
@@ -136,6 +148,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                 </div>
                             </div>
 
+                            <!-- Second Row: Notes -->
                             <div class="row">
                                 <div class="col-md-12">
                                     <div class="mb-3">
@@ -169,38 +182,6 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                         </div>
                     </div>
                 </div>
-
-                <!-- Summary Information -->
-                <div class="col-lg-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5 class="card-title mb-0">Resumen</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label for="jform_amount_total" class="form-label">
-                                    Total
-                                </label>
-                                <div class="input-group">
-                                    <span class="input-group-text">Q</span>
-                                    <input type="text" name="jform[amount_total]" id="jform_amount_total" 
-                                           value="<?php echo htmlspecialchars($this->item->amount_total ?? '0.00'); ?>" 
-                                           class="form-control" readonly />
-                                </div>
-                                <small class="form-text text-muted">Se calcula automáticamente</small>
-                            </div>
-
-                            <div class="alert alert-info">
-                                <h6><i class="fas fa-info-circle"></i> Información</h6>
-                                <ul class="mb-0">
-                                    <li>El número se genera automáticamente</li>
-                                    <li>El total se calcula en Odoo</li>
-                                    <li>Agente: <?php echo htmlspecialchars($user->name); ?></li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Hidden fields -->
@@ -227,58 +208,8 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                     </div>
                     <div class="card-body">
                         
-                        <!-- Add Product Line Form -->
-                        <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
-                              method="post" class="add-line-form">
-                            <div class="card border-success">
-                                <div class="card-header bg-light">
-                                    <h6 class="mb-0">
-                                        <i class="fas fa-plus"></i> Agregar Producto
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="mb-3">
-                                                <label for="line_description" class="form-label">Descripción del Producto *</label>
-                                                <textarea name="line_description" id="line_description" class="form-control" rows="3" 
-                                                          placeholder="Descripción detallada del producto o servicio..." required></textarea>
-                                                <small class="form-text text-muted">
-                                                    Incluye especificaciones, materiales, dimensiones, etc.
-                                                </small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="mb-3">
-                                                <label for="line_quantity" class="form-label">Cantidad *</label>
-                                                <input type="number" name="line_quantity" id="line_quantity" class="form-control" 
-                                                       value="1" min="1" step="1" required />
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="mb-3">
-                                                <label for="line_price" class="form-label">Precio Unitario *</label>
-                                                <div class="input-group">
-                                                    <span class="input-group-text">Q</span>
-                                                    <input type="number" name="line_price" id="line_price" class="form-control" 
-                                                           step="0.01" min="0" placeholder="0.00" required />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-end">
-                                        <button type="submit" name="task" value="cotizacion.addLine" class="btn btn-success">
-                                            <i class="fas fa-plus"></i> Agregar Línea
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <input type="hidden" name="quote_id" value="<?php echo (int)$this->item->id; ?>" />
-                            <?php echo HTMLHelper::_('form.token'); ?>
-                        </form>
-
                         <!-- Quote Lines Table -->
-                        <div class="quote-lines-table mt-4">
+                        <div class="quote-lines-table">
                             <table class="table table-striped">
                                 <thead class="table-success">
                                     <tr>
@@ -384,6 +315,56 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                 </tfoot>
                             </table>
                         </div>
+                        
+                        <!-- Add Product Line Form - Moved to bottom -->
+                        <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                              method="post" class="add-line-form mt-4">
+                            <div class="card border-success">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-plus"></i> Agregar Producto
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="line_description" class="form-label">Descripción del Producto *</label>
+                                                <textarea name="line_description" id="line_description" class="form-control" rows="3" 
+                                                          placeholder="Descripción detallada del producto o servicio..." required></textarea>
+                                                <small class="form-text text-muted">
+                                                    Incluye especificaciones, materiales, dimensiones, etc.
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label for="line_quantity" class="form-label">Cantidad *</label>
+                                                <input type="number" name="line_quantity" id="line_quantity" class="form-control" 
+                                                       value="1" min="1" step="1" required />
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label for="line_price" class="form-label">Precio Unitario *</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">Q</span>
+                                                    <input type="number" name="line_price" id="line_price" class="form-control" 
+                                                           step="0.01" min="0" placeholder="0.00" required />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" name="task" value="cotizacion.addLine" class="btn btn-success">
+                                            <i class="fas fa-plus"></i> Agregar Línea
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="quote_id" value="<?php echo (int)$this->item->id; ?>" />
+                            <?php echo HTMLHelper::_('form.token'); ?>
+                        </form>
                     </div>
                 </div>
             </div>
