@@ -18,7 +18,16 @@ use Joomla\CMS\Session\Session;
 HTMLHelper::_('bootstrap.framework');
 HTMLHelper::_('behavior.formvalidator');
 
-$isNew = (!isset($this->item->id) || (int)$this->item->id === 0);
+// Safe function to get object property
+function safeGet($obj, $property, $default = '') {
+    if (is_object($obj) && property_exists($obj, $property)) {
+        $value = $obj->$property;
+        return ($value !== null && $value !== '') ? $value : $default;
+    }
+    return $default;
+}
+
+$isNew = (safeGet($this->item, 'id', 0) == 0);
 $user = Factory::getUser();
 
 // Get current action from URL
@@ -34,7 +43,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                     <?php if ($isNew): ?>
                         Nueva Cotización
                     <?php else: ?>
-                        <?php echo htmlspecialchars($this->item->name ?? 'Cotización'); ?>
+                        <?php echo htmlspecialchars(safeGet($this->item, 'name', 'Cotización')); ?>
                     <?php endif; ?>
                 </h1>
                 <nav aria-label="breadcrumb">
@@ -45,7 +54,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                             </a>
                         </li>
                         <li class="breadcrumb-item active" aria-current="page">
-                            <?php echo $isNew ? 'Nueva Cotización' : htmlspecialchars($this->item->name ?? 'Cotización'); ?>
+                            <?php echo $isNew ? 'Nueva Cotización' : htmlspecialchars(safeGet($this->item, 'name', 'Cotización')); ?>
                         </li>
                     </ol>
                 </nav>
@@ -54,7 +63,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
     </div>
 
     <!-- Quote Header Form -->
-    <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int) ($this->item->id ?? 0)); ?>" 
+    <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int) safeGet($this->item, 'id', 0)); ?>" 
           method="post" name="quoteForm" id="quoteForm" class="form-validate">
         
         <div class="quote-form-container">
@@ -81,10 +90,15 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                 try {
                                                     $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
                                                     $clients = $helper->getClients();
-                                                    foreach ($clients as $client) {
-                                                        $selected = (isset($this->item->partner_id) && $this->item->partner_id == $client['id']) ? 'selected' : '';
+                                                    if (is_array($clients)) {
+                                                        foreach ($clients as $client) {
+                                                            if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) {
+                                                                continue;
+                                                            }
+                                                            $selected = (safeGet($this->item, 'partner_id', 0) == $client['id']) ? 'selected' : '';
                                                         echo '<option value="' . (int)$client['id'] . '" ' . $selected . '>' . 
                                                              htmlspecialchars($client['name']) . '</option>';
+                                                        }
                                                     }
                                                 } catch (Exception $e) {
                                                     echo '<option value="">Error cargando clientes</option>';
@@ -97,10 +111,10 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                 Cliente
                                             </label>
                                             <input type="text" id="jform_client_name" 
-                                                   value="<?php echo htmlspecialchars($this->item->contact_name ?? 'Cliente no disponible'); ?>" 
+                                                   value="<?php echo htmlspecialchars(safeGet($this->item, 'contact_name', 'Cliente no disponible')); ?>" 
                                                    class="form-control" readonly />
                                             <input type="hidden" name="jform[partner_id]" 
-                                                   value="<?php echo htmlspecialchars($this->item->partner_id ?? ''); ?>" />
+                                                   value="<?php echo htmlspecialchars(safeGet($this->item, 'partner_id', '')); ?>" />
                                             <small class="form-text text-muted">El cliente no se puede cambiar una vez creada la cotización</small>
                                         <?php endif; ?>
                                     </div>
@@ -111,7 +125,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             Fecha de Cotización *
                                         </label>
                                         <input type="date" name="jform[date_order]" id="jform_date_order" 
-                                               value="<?php echo date('Y-m-d', strtotime($this->item->date_order ?? date('Y-m-d'))); ?>" 
+                                               value="<?php echo date('Y-m-d', strtotime(safeGet($this->item, 'date_order', date('Y-m-d')))); ?>" 
                                                class="form-control required" required />
                                     </div>
                                 </div>
@@ -121,10 +135,10 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             Número de Cotización
                                         </label>
                                         <input type="text" name="jform[name]" id="jform_name" 
-                                               value="<?php echo htmlspecialchars($this->item->name ?? ''); ?>" 
+                                               value="<?php echo htmlspecialchars(safeGet($this->item, 'name', '')); ?>" 
                                                class="form-control" readonly />
                                         <small class="form-text text-muted">
-                                            <?php if (empty($this->item->name) || $this->item->name === ''): ?>
+                                            <?php if (empty(safeGet($this->item, 'name', ''))): ?>
                                                 Se generará automáticamente al guardar
                                             <?php else: ?>
                                                 Generado automáticamente por Odoo
@@ -142,7 +156,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             Notas
                                         </label>
                                         <textarea name="jform[note]" id="jform_note" 
-                                                 class="form-control" rows="4"><?php echo htmlspecialchars($this->item->note ?? ''); ?></textarea>
+                                                 class="form-control" rows="4"><?php echo htmlspecialchars(safeGet($this->item, 'note', '')); ?></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -159,7 +173,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                     <button type="submit" name="task" value="cotizacion.save" class="btn btn-success">
                                         <i class="fas fa-save"></i> Guardar Información Básica
                                     </button>
-                                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)$this->item->id); ?>" 
+                                    <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)safeGet($this->item, 'id', 0)); ?>" 
                                        class="btn btn-info">
                                         <i class="fas fa-sync-alt"></i> Actualizar
                                     </a>
@@ -171,17 +185,17 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
             </div>
 
             <!-- Hidden fields -->
-            <input type="hidden" name="id" value="<?php echo (int) ($this->item->id ?? 0); ?>" />
+            <input type="hidden" name="id" value="<?php echo (int) safeGet($this->item, 'id', 0); ?>" />
             <?php echo HTMLHelper::_('form.token'); ?>
         </div>
     </form>
 
     <!-- Quote Lines Section - Only show if quote has been created -->
-    <?php if (safeProperty($this->item, 'id', 0) > 0 && !empty(safeProperty($this->item, 'name', ''))): ?>
+    <?php if (safeGet($this->item, 'id', 0) > 0 && !empty(safeGet($this->item, 'name', ''))): ?>
         <?php
         // Load existing quote lines
         $model = $this->getModel();
-        $existingLines = $model->getQuoteLines(safeProperty($this->item, 'id', 0));
+        $existingLines = $model->getQuoteLines(safeGet($this->item, 'id', 0));
         ?>
         
         <div class="row mt-4">

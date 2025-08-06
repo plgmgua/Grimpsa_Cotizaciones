@@ -61,8 +61,53 @@ class HtmlView extends BaseHtmlView
         $app = Factory::getApplication();
         $this->input = $app->input;
         
-        // Initialize with default item first
-        $this->item = (object) [
+        // Always initialize with a safe default item structure
+        $this->item = $this->createDefaultItem();
+        
+        try {
+            // Get the item from model
+            $modelItem = $this->get('Item');
+            
+            // Only use model item if it's valid
+            if (is_object($modelItem) && isset($modelItem->id)) {
+                $this->item = $modelItem;
+            }
+            
+            // Ensure all required properties exist
+            $this->item = $this->ensureItemProperties($this->item);
+            
+        } catch (Exception $e) {
+            // Log error but continue with default item
+            $app->enqueueMessage('Error loading quote data: ' . $e->getMessage(), 'warning');
+        }
+
+        // Try to get form (optional)
+        try {
+            $this->form = $this->get('Form');
+        } catch (Exception $e) {
+            $this->form = null;
+        }
+
+        // Try to get state (optional)
+        try {
+            $this->state = $this->get('State');
+        } catch (Exception $e) {
+            $this->state = new \Joomla\Registry\Registry();
+        }
+
+        $this->_prepareDocument();
+
+        parent::display($tpl);
+    }
+
+    /**
+     * Create a default item with all required properties
+     *
+     * @return  object  Default item object
+     */
+    private function createDefaultItem()
+    {
+        return (object) [
             'id' => 0,
             'name' => '',
             'partner_id' => 0,
@@ -72,40 +117,32 @@ class HtmlView extends BaseHtmlView
             'state' => 'draft',
             'note' => ''
         ];
+    }
+
+    /**
+     * Ensure item has all required properties
+     *
+     * @param   mixed  $item  The item to check
+     *
+     * @return  object  Item with all properties
+     */
+    private function ensureItemProperties($item)
+    {
+        $defaultItem = $this->createDefaultItem();
         
-        try {
-            // Try to get the form (may not be needed for this view)
-            try {
-                $this->form = $this->get('Form');
-            } catch (Exception $e) {
-                // Form not required for this view
-                $this->form = null;
-            }
-            
-            // Get the item
-            $item = $this->get('Item');
-            if (is_object($item)) {
-                $this->item = $item;
-            }
-            
-            $this->state = $this->get('State');
-
-        } catch (Exception $e) {
-            // Log the error but continue with default item
-            $app->enqueueMessage('Error loading view data: ' . $e->getMessage(), 'warning');
+        // If item is not an object, return default
+        if (!is_object($item)) {
+            return $defaultItem;
         }
-
-        // Check for errors.
-        if (count($errors = $this->get('Errors'))) {
-            // Don't throw exception, just log errors and continue
-            foreach ($errors as $error) {
-                $app->enqueueMessage($error, 'warning');
+        
+        // Ensure all properties exist
+        foreach ($defaultItem as $key => $defaultValue) {
+            if (!isset($item->$key)) {
+                $item->$key = $defaultValue;
             }
         }
-
-        $this->_prepareDocument();
-
-        parent::display($tpl);
+        
+        return $item;
     }
 
     /**
@@ -116,7 +153,7 @@ class HtmlView extends BaseHtmlView
     protected function _prepareDocument()
     {
         $app = Factory::getApplication();
-        $isNew = ($this->item->id == 0);
+        $isNew = (isset($this->item->id) && $this->item->id == 0);
         
         $title = $isNew ? Text::_('COM_COTIZACIONES_COTIZACION_NEW') : Text::_('COM_COTIZACIONES_COTIZACION_EDIT');
         

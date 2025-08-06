@@ -72,8 +72,8 @@ class CotizacionModel extends AdminModel
         
         $pk = (int) $pk;
 
-        // Always return a valid object structure
-        $defaultItem = (object) [
+        // Create default item structure
+        $defaultItem = [
             'id' => $pk,
             'name' => '',
             'partner_id' => 0,
@@ -86,28 +86,28 @@ class CotizacionModel extends AdminModel
         
         // For new quotes, return default item
         if ($pk <= 0) {
-            return $defaultItem;
+            return (object) $defaultItem;
         }
 
         try {
             $helper = new OdooHelper();
             $quote = $helper->getQuote($pk);
 
-            if (!$quote || !is_array($quote)) {
-                return $defaultItem;
+            if (!$quote || !is_array($quote) || empty($quote)) {
+                return (object) $defaultItem;
             }
 
             // Ensure all properties exist
-            foreach ($defaultItem as $key => $value) {
-                if (!isset($quote[$key])) {
-                    $quote[$key] = $value;
+            foreach ($defaultItem as $key => $defaultValue) {
+                if (!isset($quote[$key]) || $quote[$key] === null) {
+                    $quote[$key] = $defaultValue;
                 }
             }
 
             return (object) $quote;
         } catch (Exception $e) {
             Factory::getApplication()->enqueueMessage('Error loading quote: ' . $e->getMessage(), 'warning');
-            return $defaultItem;
+            return (object) $defaultItem;
         }
     }
 
