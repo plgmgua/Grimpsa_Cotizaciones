@@ -575,7 +575,7 @@ class OdooHelper
 
                 // Filter out quotes without valid numbers
                 $quoteName = isset($quote['name']) ? trim($quote['name']) : '';
-                if (empty($quoteName) || $quoteName === 'Sin número' || $quoteName === 'New') {
+                if (!$this->isValidQuoteNumber($quoteName)) {
                     if ($this->debug) {
                         Factory::getApplication()->enqueueMessage('Skipping quote without valid number: ' . $quoteName, 'info');
                     }
