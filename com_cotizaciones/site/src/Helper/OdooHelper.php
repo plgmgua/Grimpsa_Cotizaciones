@@ -841,145 +841,132 @@ class OdooHelper
       <param>
          <value><array><data>
             <value><array><data>
-               <value><int>' . $quoteId . '</int></value>
-            </data></array></value>
-            <value><struct>';
-
-            foreach ($updateData as $key => $value) {
-                $xmlRequest .= '<member><name>' . htmlspecialchars($key) . '</name>';
-                if (is_int($value)) {
-                    $xmlRequest .= '<value><int>' . $value . '</int></value>';
-                } else {
-                    $xmlRequest .= '<value><string>' . htmlspecialchars($value) . '</string></value>';
-                }
-                $xmlRequest .= '</member>';
-            }
-
-            $xmlRequest .= '</struct></value>
-         </data></array></value>
-      </param>
-   </params>
-</methodCall>';
-
-            $response = $this->makeCurlRequest($this->url, $xmlRequest);
-            
-            if ($response === false) {
-                return false;
-            }
-
-            $result = $this->parseXmlResponse($response);
-
-            return $result === true;
-
-        } catch (Exception $e) {
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Error updating quote: ' . $e->getMessage(), 'error');
-            }
-            return false;
-        }
     }
 
     /**
-     * Delete a quote
+     * Test Odoo connection
      *
-     * @param   integer  $quoteId  Quote ID
-     *
-     * @return  boolean  Success status
+     * @return  boolean  True if connection works
      */
-    public function deleteQuote($quoteId)
+    public function testConnection()
     {
-        try {
-            $xmlRequest = '<?xml version="1.0"?>
-<methodCall>
-   <methodName>execute_kw</methodName>
-   <params>
-      <param>
-         <value><string>' . htmlspecialchars($this->database) . '</string></value>
-      </param>
-      <param>
-         <value><int>' . $this->userId . '</int></value>
-      </param>
-      <param>
-         <value><string>' . htmlspecialchars($this->apiKey) . '</string></value>
-      </param>
-      <param>
-         <value><string>sale.order</string></value>
-      </param>
-      <param>
-         <value><string>unlink</string></value>
-      </param>
-      <param>
-         <value><array><data>
-            <value><array><data>
-               <value><int>' . $quoteId . '</int></value>
-            </data></array></value>
-         </data></array></value>
-      </param>
-   </params>
-</methodCall>';
-
-            $response = $this->makeCurlRequest($this->url, $xmlRequest);
-            
-            if ($response === false) {
-                return false;
-            }
-
-            $result = $this->parseXmlResponse($response);
-            return $result === true;
-
-        } catch (Exception $e) {
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Error deleting quote: ' . $e->getMessage(), 'error');
-            }
-            return false;
-        }
+        $test = $this->testOdooApiCall();
+        return $test['success'];
     }
 
     /**
-     * Get mock quotes as fallback
+     * Get detailed connection status for debugging
      *
-     * @param   string  $search  Search term
-     *
-     * @return  array   Array of mock quotes
+     * @return  array  Connection status details
      */
-    private function getMockQuotes($search = '')
+    public function getConnectionStatus()
     {
-        $mockQuotes = [
-            [
-                'id' => 1,
-                'name' => 'S00001',
-                'partner_id' => 123,
-                'contact_name' => 'Cliente Ejemplo 1',
-                'date_order' => date('Y-m-d'),
-                'amount_total' => '1500.00',
-                'state' => 'draft',
-                'note' => 'Cotización de ejemplo (modo offline)'
-            ],
-            [
-                'id' => 2,
-                'name' => 'S00002',
-                'partner_id' => 124,
-                'contact_name' => 'Cliente Ejemplo 2',
-                'date_order' => date('Y-m-d', strtotime('-1 day')),
-                'amount_total' => '2500.00',
-                'state' => 'sent',
-                'note' => 'Segunda cotización (modo offline)'
-            ]
+        $status = [
+            'url' => $this->url,
+            'database' => $this->database,
+            'user_id' => $this->userId,
+            'api_key_set' => !empty($this->apiKey),
+            'curl_available' => function_exists('curl_init'),
+            'connection_test' => false,
+            'authentication_test' => false,
+            'uid' => $this->userId,
+            'error_message' => ''
         ];
 
-            // Sort quotes by quote number (descending - newest first)
-            usort($processedQuotes, function($a, $b) {
-                $nameA = isset($a['name']) ? $a['name'] : '';
-                $nameB = isset($b['name']) ? $b['name'] : '';
-                
-                // Extract numeric part from quote names for proper sorting
-                $numA = $this->extractQuoteNumber($nameA);
-                $numB = $this->extractQuoteNumber($nameB);
-                
-                // Sort by numeric value descending (highest first)
-                return $numB - $numA;
-            });
+        try {
+            // Test the API call
+            $apiTest = $this->testOdooApiCall();
+            $status['connection_test'] = $apiTest['success'];
+            $status['authentication_test'] = $apiTest['success'];
+            
+            if (!$apiTest['success']) {
+                $status['error_message'] = $apiTest['error'];
+            }
+
+        } catch (Exception $e) {
+            $status['error_message'] = $e->getMessage();
         }
+
+        return $status;
+    }
+
+    /**
+     * Check if a quote number is valid
+     *
+     * @param   string  $quoteName  The quote name/number to validate
+     *
+     * @return  boolean  True if valid, false otherwise
+     */
+    private function isValidQuoteNumber($quoteName)
+    {
+        // Convert to string and trim
+        $quoteName = trim((string) $quoteName);
+        
+        // Check if empty
+        if (empty($quoteName)) {
+            return false;
+        }
+        
+        // Convert to lowercase for case-insensitive comparison
+        $lowerName = strtolower($quoteName);
+        
+        // List of invalid values
+        $invalidValues = [
+            'sin número',
+            'sin numero',
+            'new',
+            'draft',
+            'borrador',
+            'false',
+            'none',
+            'null',
+            'undefined'
+        ];
+        
+        // Check against invalid values
+        if (in_array($lowerName, $invalidValues)) {
+            return false;
+        }
+        
+        // Must be at least 3 characters
+        if (strlen($quoteName) < 3) {
+            return false;
+        }
+        
+        // Must contain at least one letter or number
+        if (!preg_match('/[a-zA-Z0-9]/', $quoteName)) {
+            return false;
+        }
+        
+        // Valid quote number
+        return true;
+    }
+
+    /**
+     * Extract numeric part from quote number for sorting
+     *
+     * @param   string  $quoteName  The quote name/number
+     *
+     * @return  integer  The numeric part for sorting
+     */
+    private function extractQuoteNumber($quoteName)
+    {
+        // Convert to string and trim
+        $quoteName = trim((string) $quoteName);
+        
+        // Extract all numbers from the quote name
+        preg_match_all('/\d+/', $quoteName, $matches);
+        
+        if (!empty($matches[0])) {
+            // Use the last (usually largest) number found
+            $numbers = $matches[0];
+            return (int) end($numbers);
+        }
+        
+        // If no numbers found, return 0 for sorting
+        return 0;
+    }
+}
 
         return array_values($mockQuotes);
     }
