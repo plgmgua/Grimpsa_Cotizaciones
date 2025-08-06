@@ -182,6 +182,11 @@ $user = Factory::getUser();
 
             <!-- Quote Lines Section - Only show if quote has been created -->
             <?php if (!empty($this->item->id) && $this->item->id > 0 && !empty($this->item->name)): ?>
+    <?php
+    // Load existing quote lines
+    $model = $this->getModel();
+    $existingLines = $model->getQuoteLines($this->item->id);
+    ?>
             <div class="row mt-4">
                 <div class="col-12">
                     <div class="card">
@@ -252,17 +257,46 @@ $user = Factory::getUser();
                                     </thead>
                                     <tbody id="quote-lines-tbody">
                                         <!-- Quote lines will be loaded here -->
+                                        <?php if (empty($existingLines)): ?>
                                         <tr id="no-lines-row">
                                             <td colspan="5" class="text-center text-muted">
                                                 <i class="fas fa-info-circle"></i> 
                                                 No hay líneas agregadas. Use el formulario de arriba para agregar productos.
                                             </td>
                                         </tr>
+                                        <?php else: ?>
+                                            <?php 
+                                            $total = 0;
+                                            foreach ($existingLines as $i => $line): 
+                                                $subtotal = $line['product_uom_qty'] * $line['price_unit'];
+                                                $total += $subtotal;
+                                            ?>
+                                            <tr data-line-id="<?php echo $line['id']; ?>" data-odoo-id="<?php echo $line['id']; ?>">
+                                                <td>
+                                                    <strong><?php echo htmlspecialchars($line['product_name']); ?></strong>
+                                                    <br><small class="text-muted"><?php echo htmlspecialchars($line['name']); ?></small>
+                                                </td>
+                                                <td><?php echo number_format($line['product_uom_qty'], 0); ?></td>
+                                                <td>Q <?php echo number_format($line['price_unit'], 2); ?></td>
+                                                <td class="currency-amount">Q <?php echo number_format($subtotal, 2); ?></td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button type="button" class="btn btn-outline-primary" onclick="editQuoteLine(<?php echo $line['id']; ?>)" title="Editar línea">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button type="button" class="btn btn-outline-danger" onclick="removeQuoteLine(<?php echo $line['id']; ?>)" title="Eliminar línea">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
                                     </tbody>
                                     <tfoot>
                                         <tr class="table-light">
                                             <th colspan="3" class="text-end">Total:</th>
-                                            <th class="currency-amount" id="quote-total">Q 0.00</th>
+                                            <th class="currency-amount" id="quote-total">Q <?php echo number_format($total ?? 0, 2); ?></th>
                                             <th></th>
                                         </tr>
                                     </tfoot>
@@ -323,6 +357,26 @@ $user = Factory::getUser();
 // Client search functionality
 let searchTimeout;
 let selectedClientId = null;
+
+// Initialize quote lines from server data
+let quoteLines = [];
+let lineCounter = 0;
+
+<?php if (!empty($existingLines)): ?>
+// Load existing lines into JavaScript
+<?php foreach ($existingLines as $line): ?>
+quoteLines.push({
+    id: <?php echo $line['id']; ?>,
+    odoo_id: <?php echo $line['id']; ?>,
+    name: '<?php echo addslashes($line['product_name']); ?>',
+    description: '<?php echo addslashes($line['name']); ?>',
+    quantity: <?php echo $line['product_uom_qty']; ?>,
+    price: <?php echo $line['price_unit']; ?>,
+    subtotal: <?php echo $line['product_uom_qty'] * $line['price_unit']; ?>
+});
+lineCounter = Math.max(lineCounter, <?php echo $line['id']; ?>);
+<?php endforeach; ?>
+<?php endif; ?>
 
 document.addEventListener('DOMContentLoaded', function() {
     const clientSearch = document.getElementById('client_search');
@@ -572,11 +626,12 @@ function createQuoteLineInOdoo(quoteId, productName, description, quantity, pric
 }
 
 function editQuoteLine(lineId) {
-    const line = quoteLines.find(l => l.id === lineId);
+    // Find line by odoo_id or id
+    const line = quoteLines.find(l => l.odoo_id === lineId || l.id === lineId);
     if (!line) return;
     
     // Create edit form inline
-    const row = document.querySelector(`tr[data-line-id="${lineId}"]`);
+    const row = document.querySelector(`tr[data-odoo-id="${lineId}"]`);
     if (!row) return;
     
     const originalContent = row.innerHTML;
@@ -686,12 +741,13 @@ function updateQuoteLineInOdoo(odooLineId, description, quantity, price, localLi
 
 function removeQuoteLine(lineId) {
     if (confirm('¿Está seguro de que desea eliminar esta línea?')) {
-        const line = quoteLines.find(l => l.id === lineId);
+        // Find line by odoo_id or id
+        const line = quoteLines.find(l => l.odoo_id === lineId || l.id === lineId);
         if (!line) return;
         
         // Delete from Odoo if it has an odoo_id
-        if (line.odoo_id) {
-            deleteQuoteLineFromOdoo(line.odoo_id, lineId);
+        if (line.odoo_id || lineId) {
+            deleteQuoteLineFromOdoo(lineId, lineId);
         } else {
             // Just remove locally
             quoteLines = quoteLines.filter(line => line.id !== lineId);

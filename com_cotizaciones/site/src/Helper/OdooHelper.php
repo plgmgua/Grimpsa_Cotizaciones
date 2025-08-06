@@ -203,19 +203,33 @@ class OdooHelper
     public function getQuoteLines($quoteId)
     {
         try {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Getting quote lines for quote ID: ' . $quoteId, 'info');
+            }
+            
             $lines = $this->odooCall('sale.order.line', 'search_read',
                 [['order_id', '=', $quoteId]],
                 ['id', 'product_id', 'name', 'product_uom_qty', 'price_unit', 'price_subtotal'],
                 ['order' => 'id asc']
             );
 
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Raw lines from Odoo: ' . print_r($lines, true), 'info');
+            }
+
             if ($lines === false || !is_array($lines)) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('No lines returned or invalid format', 'warning');
+                }
                 return [];
             }
 
             $processedLines = [];
             foreach ($lines as $line) {
                 if (!is_array($line)) {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Invalid line format: ' . print_r($line, true), 'warning');
+                    }
                     continue;
                 }
 
@@ -228,6 +242,10 @@ class OdooHelper
                     'price_unit' => isset($line['price_unit']) ? $line['price_unit'] : 0.00,
                     'price_subtotal' => isset($line['price_subtotal']) ? $line['price_subtotal'] : 0.00
                 ];
+            }
+
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Processed lines: ' . print_r($processedLines, true), 'info');
             }
 
             return $processedLines;
