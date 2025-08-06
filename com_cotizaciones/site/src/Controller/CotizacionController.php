@@ -286,6 +286,45 @@ class CotizacionController extends FormController
     }
 
     /**
+     * Search clients via AJAX
+     *
+     * @return  void
+     */
+    public function searchClients()
+    {
+        // Check for request forgeries
+        if (!Session::checkToken()) {
+            echo json_encode(['error' => 'Invalid token']);
+            exit;
+        }
+
+        $user = Factory::getUser();
+        
+        if ($user->guest) {
+            echo json_encode(['error' => 'Not logged in']);
+            exit;
+        }
+
+        $search = $this->input->getString('search', '');
+        
+        if (strlen($search) < 2) {
+            echo json_encode(['clients' => []]);
+            exit;
+        }
+
+        try {
+            $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+            $clients = $helper->getClients($search, $user->name);
+            
+            echo json_encode(['clients' => $clients]);
+        } catch (Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        
+        exit;
+    }
+
+    /**
      * Method to cancel an operation
      *
      * @param   string  $key  The name of the primary key of the URL variable.

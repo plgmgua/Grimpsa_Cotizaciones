@@ -83,29 +83,27 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             <label for="client_search" class="form-label">
                                                 Cliente *
                                             </label>
-                                            <select name="jform[partner_id]" id="jform_partner_id" class="form-select required" required>
-                                                <option value="">Seleccionar Cliente...</option>
-                                                <?php
-                                                // Load clients from Odoo
-                                                try {
-                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                                                    $clients = $helper->getClients();
-                                                    if (is_array($clients)) {
-                                                        foreach ($clients as $client) {
-                                                            if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) {
-                                                                continue;
-                                                            }
-                                                            $selected = (safeGet($this->item, 'partner_id', 0) == $client['id']) ? 'selected' : '';
-                                                        echo '<option value="' . (int)$client['id'] . '" ' . $selected . '>' . 
-                                                             htmlspecialchars($client['name']) . '</option>';
-                                                        }
-                                                    }
-                                                } catch (Exception $e) {
-                                                    echo '<option value="">Error cargando clientes</option>';
-                                                }
-                                                ?>
-                                            </select>
-                                            <small class="form-text text-muted">Seleccione un cliente existente</small>
+                                            
+                                            <!-- Client Search Input -->
+                                            <input type="text" id="client_search" class="form-control" 
+                                                   placeholder="Buscar cliente por nombre..." 
+                                                   autocomplete="off" />
+                                            <div id="client_results" class="client-results" style="display: none;"></div>
+                                            
+                                            <!-- Hidden field for selected client -->
+                                            <input type="hidden" name="jform[partner_id]" id="jform_partner_id" required />
+                                            
+                                            <!-- Selected client display -->
+                                            <div id="selected_client" class="selected-client" style="display: none;">
+                                                <div class="alert alert-success">
+                                                    <strong>Cliente seleccionado:</strong> <span id="selected_client_name"></span>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearClientSelection()">
+                                                        Cambiar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <small class="form-text text-muted">Escriba para buscar entre sus clientes asignados</small>
                                         <?php else: ?>
                                             <label for="jform_client_name" class="form-label">
                                                 Cliente
@@ -397,3 +395,107 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
         </div>
     </div>
 </div>
+
+<script>
+// Client search functionality
+let searchTimeout;
+const clientSearch = document.getElementById('client_search');
+const clientResults = document.getElementById('client_results');
+const partnerIdField = document.getElementById('jform_partner_id');
+const selectedClientDiv = document.getElementById('selected_client');
+const selectedClientName = document.getElementById('selected_client_name');
+
+if (clientSearch) {
+    clientSearch.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            clientResults.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(() => {
+            searchClients(query);
+        }, 300);
+    });
+    
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!clientSearch.contains(e.target) && !clientResults.contains(e.target)) {
+            clientResults.style.display = 'none';
+        }
+    });
+}
+
+function searchClients(query) {
+    // Show loading
+    clientResults.innerHTML = '<div class="client-result-item">Buscando...</div>';
+    clientResults.style.display = 'block';
+    
+    // Make AJAX request to search clients
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'index.php?option=com_cotizaciones&task=cotizacion.searchClients', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    displayClientResults(response.clients || []);
+                } catch (e) {
+                    clientResults.innerHTML = '<div class="client-result-item text-danger">Error en la búsqueda</div>';
+                }
+            } else {
+                clientResults.innerHTML = '<div class="client-result-item text-danger">Error de conexión</div>';
+            }
+        }
+    };
+    
+    const formData = 'search=' + encodeURIComponent(query) + '&' + 
+                     document.querySelector('input[name="' + token + '"]').name + '=' + 
+                     document.querySelector('input[name="' + token + '"]').value;
+    
+    xhr.send(formData);
+}
+
+function displayClientResults(clients) {
+    if (clients.length === 0) {
+        clientResults.innerHTML = '<div class="client-result-item text-muted">No se encontraron clientes</div>';
+        return;
+    }
+    
+    let html = '';
+    clients.forEach(client => {
+        html += `<div class="client-result-item" onclick="selectClient(${client.id}, '${client.name.replace(/'/g, "\\'")}')">
+            <strong>${client.name}</strong>
+            ${client.email ? '<br><small class="text-muted">' + client.email + '</small>' : ''}
+        </div>`;
+    });
+    
+    clientResults.innerHTML = html;
+}
+
+function selectClient(id, name) {
+    partnerIdField.value = id;
+    selectedClientName.textContent = name;
+    
+    // Hide search and show selected
+    clientSearch.style.display = 'none';
+    clientResults.style.display = 'none';
+    selectedClientDiv.style.display = 'block';
+}
+
+function clearClientSelection() {
+    partnerIdField.value = '';
+    clientSearch.value = '';
+    clientSearch.style.display = 'block';
+    selectedClientDiv.style.display = 'none';
+    clientSearch.focus();
+}
+
+// Get CSRF token
+const token = document.querySelector('input[name*="token"]').name;
+</script>

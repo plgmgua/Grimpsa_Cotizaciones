@@ -418,10 +418,15 @@ class OdooHelper
      *
      * @return  array   Array of clients
      */
-    public function getClients($search = '')
+    public function getClients($search = '', $salesAgent = '')
     {
         try {
             $domain = [['is_company', '=', true]];
+            
+            // Filter by sales agent if provided
+            if (!empty($salesAgent)) {
+                $domain[] = ['x_studio_agente_de_ventas_1', '=', $salesAgent];
+            }
             
             if (!empty($search)) {
                 $domain[] = ['name', 'ilike', $search];
@@ -429,7 +434,7 @@ class OdooHelper
             
             $clients = $this->odooCall('res.partner', 'search_read', $domain,
                 ['id', 'name', 'email', 'phone'],
-                ['limit' => 50, 'order' => 'name asc']
+                ['limit' => 100, 'order' => 'name asc']
             );
             
             if ($clients === false || !is_array($clients)) {
