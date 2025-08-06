@@ -61,43 +61,45 @@ class HtmlView extends BaseHtmlView
         $app = Factory::getApplication();
         $this->input = $app->input;
         
+        // Initialize with default item first
+        $this->item = (object) [
+            'id' => 0,
+            'name' => '',
+            'partner_id' => 0,
+            'contact_name' => '',
+            'date_order' => date('Y-m-d'),
+            'amount_total' => '0.00',
+            'state' => 'draft',
+            'note' => ''
+        ];
+        
         try {
-            $this->form = $this->get('Form');
-            $this->item = $this->get('Item');
-            $this->state = $this->get('State');
-            
-            // Ensure item is always an object with required properties
-            if (!is_object($this->item)) {
-                $this->item = (object) [
-                    'id' => 0,
-                    'name' => '',
-                    'partner_id' => 0,
-                    'contact_name' => '',
-                    'date_order' => date('Y-m-d'),
-                    'amount_total' => '0.00',
-                    'state' => 'draft',
-                    'note' => ''
-                ];
+            // Try to get the form (may not be needed for this view)
+            try {
+                $this->form = $this->get('Form');
+            } catch (Exception $e) {
+                // Form not required for this view
+                $this->form = null;
             }
+            
+            // Get the item
+            $item = $this->get('Item');
+            if (is_object($item)) {
+                $this->item = $item;
+            }
+            
+            $this->state = $this->get('State');
+
         } catch (Exception $e) {
-            // If there's an error, create a default empty item
-            $this->item = (object) [
-                'id' => 0,
-                'name' => '',
-                'partner_id' => 0,
-                'contact_name' => '',
-                'date_order' => date('Y-m-d'),
-                'amount_total' => '0.00',
-                'state' => 'draft',
-                'note' => ''
-            ];
+            // Log the error but continue with default item
+            $app->enqueueMessage('Error loading view data: ' . $e->getMessage(), 'warning');
         }
 
         // Check for errors.
         if (count($errors = $this->get('Errors'))) {
             // Don't throw exception, just log errors and continue
             foreach ($errors as $error) {
-                Factory::getApplication()->enqueueMessage($error, 'warning');
+                $app->enqueueMessage($error, 'warning');
             }
         }
 

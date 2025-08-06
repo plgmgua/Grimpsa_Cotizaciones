@@ -67,7 +67,7 @@ class CotizacionModel extends AdminModel
         
         // Get the ID from input or state, default to 0 for new quotes
         if ($pk === null) {
-            $pk = (int) $this->getState($this->getName() . '.id', 0);
+            $pk = (int) $app->input->getInt('id', 0);
         }
         
         $pk = (int) $pk;
@@ -93,7 +93,7 @@ class CotizacionModel extends AdminModel
             $helper = new OdooHelper();
             $quote = $helper->getQuote($pk);
 
-            if (!$quote) {
+            if (!$quote || !is_array($quote)) {
                 return $defaultItem;
             }
 
