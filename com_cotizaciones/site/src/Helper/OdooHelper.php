@@ -961,10 +961,17 @@ class OdooHelper
             ]
         ];
 
-        // Filter by search if provided
-        if (!empty($search)) {
-            $mockQuotes = array_filter($mockQuotes, function($quote) use ($search) {
-                return stripos($quote['contact_name'], $search) !== false;
+            // Sort quotes by quote number (descending - newest first)
+            usort($processedQuotes, function($a, $b) {
+                $nameA = isset($a['name']) ? $a['name'] : '';
+                $nameB = isset($b['name']) ? $b['name'] : '';
+                
+                // Extract numeric part from quote names for proper sorting
+                $numA = $this->extractQuoteNumber($nameA);
+                $numB = $this->extractQuoteNumber($nameB);
+                
+                // Sort by numeric value descending (highest first)
+                return $numB - $numA;
             });
         }
 
@@ -1068,5 +1075,30 @@ class OdooHelper
         
         // Valid quote number
         return true;
+    }
+
+    /**
+     * Extract numeric part from quote number for sorting
+     *
+     * @param   string  $quoteName  The quote name/number
+     *
+     * @return  integer  The numeric part for sorting
+     */
+    private function extractQuoteNumber($quoteName)
+    {
+        // Convert to string and trim
+        $quoteName = trim((string) $quoteName);
+        
+        // Extract all numbers from the quote name
+        preg_match_all('/\d+/', $quoteName, $matches);
+        
+        if (!empty($matches[0])) {
+            // Use the last (usually largest) number found
+            $numbers = $matches[0];
+            return (int) end($numbers);
+        }
+        
+        // If no numbers found, return 0 for sorting
+        return 0;
     }
 }
