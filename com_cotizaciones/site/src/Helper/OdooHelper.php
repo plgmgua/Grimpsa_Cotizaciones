@@ -573,6 +573,15 @@ class OdooHelper
                     continue;
                 }
 
+                // Filter out quotes without valid numbers
+                $quoteName = isset($quote['name']) ? trim($quote['name']) : '';
+                if (empty($quoteName) || $quoteName === 'Sin número' || $quoteName === 'New') {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Skipping quote without valid number: ' . $quoteName, 'info');
+                    }
+                    continue;
+                }
+
                 $processedQuote = [
                     'id' => isset($quote['id']) ? $quote['id'] : 0,
                     'name' => isset($quote['name']) ? $quote['name'] : 'Sin número',
@@ -932,7 +941,7 @@ class OdooHelper
         $mockQuotes = [
             [
                 'id' => 1,
-                'name' => 'SO001',
+                'name' => 'S00001',
                 'partner_id' => 123,
                 'contact_name' => 'Cliente Ejemplo 1',
                 'date_order' => date('Y-m-d'),
@@ -942,7 +951,7 @@ class OdooHelper
             ],
             [
                 'id' => 2,
-                'name' => 'SO002',
+                'name' => 'S00002',
                 'partner_id' => 124,
                 'contact_name' => 'Cliente Ejemplo 2',
                 'date_order' => date('Y-m-d', strtotime('-1 day')),
