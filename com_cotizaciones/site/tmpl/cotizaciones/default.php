@@ -17,8 +17,9 @@ use Joomla\CMS\Factory;
 
 HTMLHelper::_('bootstrap.framework');
 
-$user = Factory::getUser();
+// Initialize variables safely
 $app = Factory::getApplication();
+$user = Factory::getUser();
 
 // Safe function to escape strings
 function safeEscape($value, $default = '') {
@@ -38,27 +39,55 @@ function safeGet($array, $key, $default = '') {
 
 // Function to get state badge class
 function getStateBadgeClass($state) {
-    switch (trim($state)) {
-        case 'draft': return 'bg-secondary';
-        case 'sent': return 'bg-info';
-        case 'sale': return 'bg-success';
-        case 'done': return 'bg-primary';
-        case 'cancel': return 'bg-danger';
-        default: return 'bg-secondary';
+    $state = trim($state);
+    switch ($state) {
+        case 'draft': 
+            return 'bg-secondary';
+        case 'sent': 
+            return 'bg-info';
+        case 'sale': 
+            return 'bg-success';
+        case 'done': 
+            return 'bg-primary';
+        case 'cancel': 
+            return 'bg-danger';
+        default: 
+            return 'bg-secondary';
     }
 }
 
 // Function to get state label
 function getStateLabel($state) {
-    switch (trim($state)) {
-        case 'draft': return 'Borrador';
-        case 'sent': return 'Enviada';
-        case 'sale': return 'Confirmada';
-        case 'done': return 'Completada';
-        case 'cancel': return 'Cancelada';
-        default: return 'Borrador';
+    $state = trim($state);
+    switch ($state) {
+        case 'draft': 
+            return 'Borrador';
+        case 'sent': 
+            return 'Enviada';
+        case 'sale': 
+            return 'Confirmada';
+        case 'done': 
+            return 'Completada';
+        case 'cancel': 
+            return 'Cancelada';
+        default: 
+            return 'Borrador';
     }
 }
+
+// Get filter values safely
+$currentSearch = '';
+$currentState = '';
+$currentLimit = 20;
+
+if (isset($this->state) && is_object($this->state)) {
+    $currentSearch = $this->state->get('filter.search', '');
+    $currentState = $this->state->get('filter.state', '');
+    $currentLimit = $this->state->get('list.limit', 20);
+}
+
+$hasSearch = !empty($currentSearch);
+$hasStateFilter = !empty($currentState);
 ?>
 
 <div class="cotizaciones-component">
@@ -83,24 +112,20 @@ function getStateLabel($state) {
                             <i class="fas fa-search"></i>
                         </span>
                         <input type="text" name="filter_search" id="filter_search" 
-                               value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" 
+                               value="<?php echo safeEscape($currentSearch); ?>" 
                                class="form-control" 
                                placeholder="Buscar por nombre de cliente..." />
                         <button class="btn btn-outline-secondary" type="submit">
                             Buscar
                         </button>
-                        <?php 
-                        $hasSearch = isset($this->state) && !empty($this->state->get('filter.search', ''));
-                        $hasStateFilter = isset($this->state) && !empty($this->state->get('filter.state', ''));
-                        if ($hasSearch || $hasStateFilter): 
-                        ?>
+                        <?php if ($hasSearch || $hasStateFilter): ?>
                             <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                                class="btn btn-outline-warning" title="Limpiar búsqueda">
                                 <i class="fas fa-times"></i>
                             </a>
                         <?php endif; ?>
                     </div>
-                    <input type="hidden" name="filter_state" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.state', '') : ''); ?>" />
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($currentState); ?>" />
                     <input type="hidden" name="task" value="" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
@@ -113,7 +138,6 @@ function getStateLabel($state) {
                         </span>
                         <select name="filter_state" class="form-select" onchange="this.form.submit()">
                             <option value="">Todos los Estados</option>
-                            <?php $currentState = isset($this->state) ? $this->state->get('filter.state', '') : ''; ?>
                             <option value="draft" <?php echo ($currentState == 'draft') ? 'selected' : ''; ?>>Borrador</option>
                             <option value="sent" <?php echo ($currentState == 'sent') ? 'selected' : ''; ?>>Enviada</option>
                             <option value="sale" <?php echo ($currentState == 'sale') ? 'selected' : ''; ?>>Confirmada</option>
@@ -122,7 +146,7 @@ function getStateLabel($state) {
                         </select>
                     </div>
                     <input type="hidden" name="task" value="" />
-                    <input type="hidden" name="filter_search" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($currentSearch); ?>" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
@@ -133,15 +157,14 @@ function getStateLabel($state) {
                             <i class="fas fa-list"></i>
                         </span>
                         <select name="limit" class="form-select" onchange="this.form.submit()">
-                            <?php $currentLimit = isset($this->state) ? $this->state->get('list.limit', 20) : 20; ?>
                             <option value="20" <?php echo ($currentLimit == 20) ? 'selected' : ''; ?>>20 por página</option>
                             <option value="30" <?php echo ($currentLimit == 30) ? 'selected' : ''; ?>>30 por página</option>
                             <option value="50" <?php echo ($currentLimit == 50) ? 'selected' : ''; ?>>50 por página</option>
                         </select>
                     </div>
                     <input type="hidden" name="task" value="" />
-                    <input type="hidden" name="filter_search" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" />
-                    <input type="hidden" name="filter_state" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.state', '') : ''); ?>" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($currentSearch); ?>" />
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($currentState); ?>" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
@@ -165,11 +188,11 @@ function getStateLabel($state) {
                         <i class="fas fa-filter"></i> 
                         Filtros activos:
                         <?php if ($hasSearch): ?>
-                            <strong>Búsqueda:</strong> "<?php echo safeEscape($this->state->get('filter.search', '')); ?>"
+                            <strong>Búsqueda:</strong> "<?php echo safeEscape($currentSearch); ?>"
                         <?php endif; ?>
                         <?php if ($hasStateFilter): ?>
                             <?php if ($hasSearch): ?> | <?php endif; ?>
-                            <strong>Estado:</strong> <?php echo getStateLabel($this->state->get('filter.state', '')); ?>
+                            <strong>Estado:</strong> <?php echo getStateLabel($currentState); ?>
                         <?php endif; ?>
                         <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                            class="btn btn-sm btn-outline-primary ms-2">
@@ -283,7 +306,7 @@ function getStateLabel($state) {
             </table>
             
             <!-- Pagination -->
-            <?php if ($this->pagination && $this->pagination->pagesTotal > 1): ?>
+            <?php if (isset($this->pagination) && $this->pagination && $this->pagination->pagesTotal > 1): ?>
                 <div class="d-flex justify-content-center mt-4">
                     <?php echo $this->pagination->getListFooter(); ?>
                 </div>
