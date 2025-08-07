@@ -118,7 +118,9 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                             if (!empty($clientSearch) && strlen($clientSearch) >= 2) {
                                                 try {
                                                     $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                                                    $clients = $helper->getClients($clientSearch, $user->name);
+                                                    // Convert search term to lowercase for better matching
+                                                    $searchTerm = trim($clientSearch);
+                                                    $clients = $helper->getClients($searchTerm, $user->name);
                                                     
                                                     // Ensure clients is an array
                                                     if (!is_array($clients)) {
@@ -149,7 +151,7 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     <div class="input-group">
                                                         <input type="text" name="client_search" class="form-control" 
                                                                value="<?php echo htmlspecialchars($clientSearch); ?>"
-                                                               placeholder="Buscar cliente por nombre..." 
+                                                               placeholder="Buscar cliente por nombre (no importa mayúsculas/minúsculas)..." 
                                                                minlength="2" />
                                                         <button type="submit" class="btn btn-outline-primary">
                                                             <i class="fas fa-search"></i> Buscar
@@ -167,12 +169,13 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     <?php if (empty($clients)): ?>
                                                         <div class="alert alert-warning">
                                                             <i class="fas fa-exclamation-triangle"></i>
-                                                            No se encontraron clientes con el término "<?php echo htmlspecialchars($clientSearch); ?>"
+                                                            No se encontraron clientes que contengan "<?php echo htmlspecialchars($clientSearch); ?>" en su nombre
+                                                            <br><small class="text-muted">La búsqueda no distingue entre mayúsculas y minúsculas y busca coincidencias parciales</small>
                                                         </div>
                                                     <?php else: ?>
                                                         <div class="card">
                                                             <div class="card-header">
-                                                                <small>Resultados de búsqueda (<?php echo count($clients); ?> encontrados):</small>
+                                                                <small>Resultados para "<?php echo htmlspecialchars($clientSearch); ?>" (<?php echo count($clients); ?> encontrados):</small>
                                                             </div>
                                                             <div class="card-body p-0">
                                                                 <div class="list-group list-group-flush">
@@ -184,6 +187,9 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                                                 <strong><?php echo htmlspecialchars($client['name']); ?></strong>
                                                                                 <?php if (!empty($client['email'])): ?>
                                                                                     <br><small class="text-muted"><?php echo htmlspecialchars($client['email']); ?></small>
+                                                                                <?php endif; ?>
+                                                                                <?php if (!empty($client['phone'])): ?>
+                                                                                    <br><small class="text-muted">📞 <?php echo htmlspecialchars($client['phone']); ?></small>
                                                                                 <?php endif; ?>
                                                                             </button>
                                                                             <?php echo HTMLHelper::_('form.token'); ?>
@@ -201,7 +207,7 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                             
                                             <small class="form-text text-muted">
                                                 <?php if (!$selectedClient): ?>
-                                                    Busque entre sus clientes asignados (mínimo 2 caracteres)
+                                                    Busque entre sus clientes asignados (mínimo 2 caracteres, no importa mayúsculas/minúsculas)
                                                 <?php endif; ?>
                                             </small>
                                         <?php else: ?>

@@ -441,7 +441,7 @@ class OdooHelper
             
             if (!empty($search)) {
                 $domain[] = ['name', 'ilike', $search];
-            }
+                $domain[] = ['name', 'ilike', '%' . $searchTerm . '%'];
             
             if ($this->debug) {
                 Factory::getApplication()->enqueueMessage('Client search domain: ' . print_r($domain, true), 'info');
@@ -451,9 +451,9 @@ class OdooHelper
                 ['id', 'name', 'email', 'phone'],
                 ['limit' => 100, 'order' => 'name asc']
             );
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Raw clients from Odoo: ' . print_r($clients, true), 'info');
+                0,      // offset
+                100,    // limit
+                'name asc'  // order by name ascending
             }
             
             if ($clients === false || !is_array($clients)) {
