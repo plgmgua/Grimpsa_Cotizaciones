@@ -406,9 +406,9 @@ class OdooHelper
             $uid = $this->authenticate();
             $config = $this->getConfig();
             
-            // Search for clients with case-insensitive partial match
+            // Search for clients with exact match
             $domain = [
-                ['name', 'ilike', trim($searchTerm)],
+                ['name', '=', $searchTerm],
                 ['is_company', '=', true]
             ];
             
