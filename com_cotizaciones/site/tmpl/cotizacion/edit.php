@@ -85,10 +85,17 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             </label>
                                             
                                             <?php 
+                                            // Clear client selection
+                                            if ($app->input->post->get('clear_client')) {
+                                                // Redirect to clear the POST data
+                                                $app->redirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0'));
+                                                return;
+                                            }
+                                            
                                             // Get search term and clients
                                             $clientSearch = Factory::getApplication()->input->getString('client_search', '');
                                             $selectedClientId = Factory::getApplication()->input->getInt('selected_client_id', 0);
-                                            $clients = [];
+                                            $clients = array();
                                             $selectedClient = null;
                                             
                                             // If we have a selected client, get its info
@@ -96,11 +103,11 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                 try {
                                                     $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
                                                     $clientInfo = $helper->getClientById($selectedClientId);
-                                                    if ($clientInfo) {
+                                                    if ($clientInfo && is_array($clientInfo)) {
                                                         $selectedClient = $clientInfo;
                                                     }
                                                 } catch (Exception $e) {
-                                                    // Ignore error, will show search form
+                                                    Factory::getApplication()->enqueueMessage('Error loading selected client: ' . $e->getMessage(), 'warning');
                                                 }
                                             }
                                             
@@ -109,8 +116,14 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                 try {
                                                     $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
                                                     $clients = $helper->getClients($clientSearch, $user->name);
+                                                    
+                                                    // Ensure clients is an array
+                                                    if (!is_array($clients)) {
+                                                        $clients = array();
+                                                    }
                                                 } catch (Exception $e) {
                                                     Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'warning');
+                                                    $clients = array();
                                                 }
                                             }
                                             ?>
@@ -118,7 +131,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             <?php if ($selectedClient): ?>
                                                 <!-- Selected Client Display -->
                                                 <div class="alert alert-success">
-                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars($selectedClient['name']); ?>
+                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars(isset($selectedClient['name']) ? $selectedClient['name'] : 'Cliente desconocido'); ?>
                                                     <form method="post" style="display: inline;" class="ms-2">
                                                         <button type="submit" name="clear_client" value="1" class="btn btn-sm btn-outline-secondary">
                                                             Cambiar Cliente
@@ -126,7 +139,7 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                         <?php echo HTMLHelper::_('form.token'); ?>
                                                     </form>
                                                 </div>
-                                                <input type="hidden" name="jform[partner_id]" value="<?php echo $selectedClient['id']; ?>" required />
+                                                <input type="hidden" name="jform[partner_id]" value="<?php echo isset($selectedClient['id']) ? (int)$selectedClient['id'] : 0; ?>" required />
                                             <?php else: ?>
                                                 <!-- Client Search Form -->
                                                 <form method="post" class="mb-2">
@@ -161,8 +174,9 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                             <div class="card-body p-0">
                                                                 <div class="list-group list-group-flush">
                                                                     <?php foreach ($clients as $client): ?>
+                                                                        <?php if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) continue; ?>
                                                                         <form method="post" style="display: inline;">
-                                                                            <button type="submit" name="selected_client_id" value="<?php echo $client['id']; ?>" 
+                                                                            <button type="submit" name="selected_client_id" value="<?php echo (int)$client['id']; ?>" 
                                                                                     class="list-group-item list-group-item-action text-start">
                                                                                 <strong><?php echo htmlspecialchars($client['name']); ?></strong>
                                                                                 <?php if (!empty($client['email'])): ?>

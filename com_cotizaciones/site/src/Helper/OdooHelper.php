@@ -421,6 +421,10 @@ class OdooHelper
     public function getClients($search = '', $salesAgent = '')
     {
         try {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage("Searching clients with search='$search' and salesAgent='$salesAgent'", 'info');
+            }
+            
             $domain = [['is_company', '=', true]];
             
             // Filter by sales agent using the correct field
@@ -432,16 +436,43 @@ class OdooHelper
                 $domain[] = ['name', 'ilike', $search];
             }
             
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Client search domain: ' . print_r($domain, true), 'info');
+            }
+            
             $clients = $this->odooCall('res.partner', 'search_read', $domain,
                 ['id', 'name', 'email', 'phone'],
                 ['limit' => 100, 'order' => 'name asc']
             );
             
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Raw clients from Odoo: ' . print_r($clients, true), 'info');
+            }
+            
             if ($clients === false || !is_array($clients)) {
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Clients result is not an array: ' . gettype($clients), 'warning');
+                }
                 return [];
             }
             
-            return $clients;
+            // Validate each client record
+            $validClients = [];
+            foreach ($clients as $client) {
+                if (is_array($client) && isset($client['id']) && isset($client['name'])) {
+                    $validClients[] = $client;
+                } else {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Invalid client record: ' . print_r($client, true), 'warning');
+                    }
+                }
+            }
+            
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Valid clients count: ' . count($validClients), 'info');
+            }
+            
+            return $validClients;
             
         } catch (Exception $e) {
             if ($this->debug) {
@@ -461,13 +492,24 @@ class OdooHelper
     public function getClientById($clientId)
     {
         try {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage("Getting client by ID: $clientId", 'info');
+            }
+            
             $clients = $this->odooCall('res.partner', 'search_read',
                 [['id', '=', $clientId]],
                 ['id', 'name', 'email', 'phone']
             );
             
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Client by ID result: ' . print_r($clients, true), 'info');
+            }
+            
             if ($clients && is_array($clients) && count($clients) > 0) {
-                return $clients[0];
+                $client = $clients[0];
+                if (is_array($client) && isset($client['id']) && isset($client['name'])) {
+                    return $client;
+                }
             }
             
             return false;
