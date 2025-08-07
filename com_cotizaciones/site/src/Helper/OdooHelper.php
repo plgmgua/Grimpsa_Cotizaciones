@@ -395,7 +395,7 @@ class OdooHelper
             
             // Search for clients with case-insensitive partial match
             $domain = [
-                ['name', 'ilike', trim($searchTerm)],
+                ['name', '=', $searchTerm],
                 ['is_company', '=', true]
             ];
             
