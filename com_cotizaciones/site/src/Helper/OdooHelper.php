@@ -258,6 +258,7 @@ class OdooHelper
             $config['username'],
             $config['password'],
             []
+            []
         ]);
         
         if (!$uid) {
