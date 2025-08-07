@@ -39,7 +39,7 @@ class OdooHelper
     }
 
     /**
-     * Make XML-RPC call to Odoo
+     * Make XML-RPC call to Odoo using cURL
      *
      * @param   string  $endpoint  The endpoint (common or object)
      * @param   string  $method    The method to call
@@ -59,34 +59,188 @@ class OdooHelper
             $url = $config['base_url'];
         }
         
-        // Prepare XML-RPC request
-        $request = xmlrpc_encode_request($method, $params);
+        // Build XML-RPC request manually
+        $xml = '<?xml version="1.0"?>';
+        $xml .= '<methodCall>';
+        $xml .= '<methodName>' . htmlspecialchars($method) . '</methodName>';
+        $xml .= '<params>';
         
-        // Create context
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => 'Content-Type: text/xml',
-                'content' => $request,
-                'timeout' => $config['timeout']
-            ]
+        foreach ($params as $param) {
+            $xml .= '<param>';
+            $xml .= $this->encodeValue($param);
+            $xml .= '</param>';
+        }
+        
+        $xml .= '</params>';
+        $xml .= '</methodCall>';
+        
+        // Use cURL for the request
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $xml);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $config['timeout']);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: text/xml',
+            'Content-Length: ' . strlen($xml)
         ]);
         
-        // Make request
-        $response = file_get_contents($url, false, $context);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        
+        if (curl_error($ch)) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            throw new \Exception('cURL error: ' . $error);
+        }
+        
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            throw new \Exception('HTTP error: ' . $httpCode);
+        }
         
         if ($response === false) {
             throw new \Exception('Failed to connect to Odoo server');
         }
         
-        // Decode response
-        $result = xmlrpc_decode($response);
-        
-        if (is_array($result) && xmlrpc_is_fault($result)) {
-            throw new \Exception('Odoo error: ' . $result['faultString']);
-        }
+        // Parse XML response
+        $result = $this->parseXmlResponse($response);
         
         return $result;
+    }
+
+    /**
+     * Encode a value for XML-RPC
+     *
+     * @param   mixed  $value  The value to encode
+     *
+     * @return  string  The encoded XML
+     */
+    private function encodeValue($value)
+    {
+        if (is_string($value)) {
+            return '<value><string>' . htmlspecialchars($value) . '</string></value>';
+        } elseif (is_int($value)) {
+            return '<value><int>' . $value . '</int></value>';
+        } elseif (is_float($value)) {
+            return '<value><double>' . $value . '</double></value>';
+        } elseif (is_bool($value)) {
+            return '<value><boolean>' . ($value ? '1' : '0') . '</boolean></value>';
+        } elseif (is_array($value)) {
+            if ($this->isAssociativeArray($value)) {
+                // Struct
+                $xml = '<value><struct>';
+                foreach ($value as $key => $val) {
+                    $xml .= '<member>';
+                    $xml .= '<name>' . htmlspecialchars($key) . '</name>';
+                    $xml .= $this->encodeValue($val);
+                    $xml .= '</member>';
+                }
+                $xml .= '</struct></value>';
+                return $xml;
+            } else {
+                // Array
+                $xml = '<value><array><data>';
+                foreach ($value as $val) {
+                    $xml .= $this->encodeValue($val);
+                }
+                $xml .= '</data></array></value>';
+                return $xml;
+            }
+        }
+        
+        return '<value><string></string></value>';
+    }
+
+    /**
+     * Check if array is associative
+     *
+     * @param   array  $array  The array to check
+     *
+     * @return  boolean  True if associative
+     */
+    private function isAssociativeArray($array)
+    {
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+
+    /**
+     * Parse XML-RPC response
+     *
+     * @param   string  $xml  The XML response
+     *
+     * @return  mixed   The parsed value
+     */
+    private function parseXmlResponse($xml)
+    {
+        $dom = new \DOMDocument();
+        $dom->loadXML($xml);
+        
+        // Check for fault
+        $fault = $dom->getElementsByTagName('fault');
+        if ($fault->length > 0) {
+            $faultValue = $fault->item(0)->getElementsByTagName('value')->item(0);
+            throw new \Exception('Odoo fault: ' . $this->parseValue($faultValue));
+        }
+        
+        // Get the return value
+        $params = $dom->getElementsByTagName('param');
+        if ($params->length > 0) {
+            $value = $params->item(0)->getElementsByTagName('value')->item(0);
+            return $this->parseValue($value);
+        }
+        
+        return null;
+    }
+
+    /**
+     * Parse XML value
+     *
+     * @param   DOMElement  $element  The XML element
+     *
+     * @return  mixed  The parsed value
+     */
+    private function parseValue($element)
+    {
+        $child = $element->firstChild;
+        
+        if (!$child) {
+            return '';
+        }
+        
+        switch ($child->nodeName) {
+            case 'string':
+                return $child->textContent;
+            case 'int':
+            case 'i4':
+                return (int) $child->textContent;
+            case 'double':
+                return (float) $child->textContent;
+            case 'boolean':
+                return $child->textContent === '1';
+            case 'array':
+                $result = [];
+                $data = $child->getElementsByTagName('data')->item(0);
+                $values = $data->getElementsByTagName('value');
+                for ($i = 0; $i < $values->length; $i++) {
+                    $result[] = $this->parseValue($values->item($i));
+                }
+                return $result;
+            case 'struct':
+                $result = [];
+                $members = $child->getElementsByTagName('member');
+                for ($i = 0; $i < $members->length; $i++) {
+                    $member = $members->item($i);
+                    $name = $member->getElementsByTagName('name')->item(0)->textContent;
+                    $value = $member->getElementsByTagName('value')->item(0);
+                    $result[$name] = $this->parseValue($value);
+                }
+                return $result;
+            default:
+                return $child->textContent;
+        }
     }
 
     /**
@@ -99,10 +253,11 @@ class OdooHelper
     {
         $config = $this->getConfig();
         
-        $uid = $this->callOdoo('common', 'login', [
+        $uid = $this->callOdoo('common', 'authenticate', [
             $config['database'],
             $config['username'],
-            $config['password']
+            $config['password'],
+            []
         ]);
         
         if (!$uid) {
@@ -134,7 +289,7 @@ class OdooHelper
                 ['x_studio_agente_de_ventas_1', '=', $agentName]
             ];
             
-            // Add search filter
+            // Add search filter - CASE INSENSITIVE PARTIAL MATCH
             if (!empty($search)) {
                 $domain[] = ['partner_id.name', 'ilike', '%' . trim($search) . '%'];
             }
@@ -237,7 +392,7 @@ class OdooHelper
     }
 
     /**
-     * Get clients for search
+     * Get clients for search - CASE INSENSITIVE PARTIAL MATCH
      *
      * @param   string  $searchTerm  Search term
      * @param   string  $agentName   Sales agent name
