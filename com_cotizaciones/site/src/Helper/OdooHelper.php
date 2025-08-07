@@ -252,7 +252,7 @@ class OdooHelper
     private function getUserId()
     {
         $config = $this->getConfig();
-        return (int) $config['user_id']; // Use user_id from config instead of authenticating
+        return 2; // Use hardcoded user ID as shown in your XML example
     }
 
     /**
