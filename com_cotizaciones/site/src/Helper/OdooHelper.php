@@ -421,6 +421,13 @@ class OdooHelper
     public function getClients($search = '', $salesAgent = '')
     {
         try {
+            $app = Factory::getApplication();
+            
+            // Ensure app is available for debugging
+            if (!$app) {
+                return [];
+            }
+            
             if ($this->debug) {
                 Factory::getApplication()->enqueueMessage("Searching clients with search='$search' and salesAgent='$salesAgent'", 'info');
             }
