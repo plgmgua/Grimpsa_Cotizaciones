@@ -198,6 +198,11 @@ class CotizacionModel extends AdminModel
     protected function populateState()
     {
         $app = Factory::getApplication();
+        
+        // Ensure app is available
+        if (!$app) {
+            return;
+        }
 
         // Load the User state.
         $pk = $app->input->getInt('id');

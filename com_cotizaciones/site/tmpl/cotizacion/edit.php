@@ -34,8 +34,8 @@ $isNew = (safeGet($this->item, 'id', 0) == 0);
 $user = Factory::getUser();
 
 // Get current action from URL
-$currentTask = Factory::getApplication()->input->get('task', '');
-$editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
+$currentTask = $app ? $app->input->get('task', '') : '';
+$editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
 ?>
 
 <div class="cotizaciones-component">

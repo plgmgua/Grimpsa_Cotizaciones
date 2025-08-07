@@ -59,6 +59,12 @@ class HtmlView extends BaseHtmlView
     public function display($tpl = null)
     {
         $app = Factory::getApplication();
+        
+        // Ensure app is available
+        if (!$app) {
+            throw new \Exception('Application not available');
+        }
+        
         $this->input = $app->input;
         
         // Always initialize with a safe default item structure
