@@ -20,6 +20,56 @@ use Joomla\CMS\Component\ComponentHelper;
 class OdooHelper
 {
     /**
+     * Make a call to Odoo XML-RPC API
+     *
+     * @param   string  $endpoint  The endpoint (common or object)
+     * @param   string  $method    The method to call
+     * @param   array   $params    The parameters to send
+     *
+     * @return  mixed   The response from Odoo
+     */
+    public function callOdoo($endpoint, $method, $params = [])
+    {
+        $config = $this->getConfig();
+        
+        // Build the URL based on endpoint
+        if ($endpoint === 'common') {
+            $url = str_replace('/xmlrpc/2/object', '/xmlrpc/2/common', $config['base_url']);
+        } else {
+            $url = $config['base_url'];
+        }
+        
+        // Prepare XML-RPC request
+        $request = xmlrpc_encode_request($method, $params);
+        
+        // Set up context
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => 'Content-Type: text/xml',
+                'content' => $request,
+                'timeout' => 30
+            ]
+        ]);
+        
+        // Make the request
+        $response = file_get_contents($url, false, $context);
+        
+        if ($response === false) {
+            throw new \Exception('Failed to connect to Odoo');
+        }
+        
+        // Decode the response
+        $result = xmlrpc_decode($response);
+        
+        if (is_array($result) && xmlrpc_is_fault($result)) {
+            throw new \Exception('Odoo error: ' . $result['faultString']);
+        }
+        
+        return $result;
+    }
+
+    /**
      * Odoo configuration
      */
     private $url;
@@ -29,7 +79,7 @@ class OdooHelper
     private $debug;
 
     /**
-     * Constructor
+        $uid = $this->callOdoo('common', 'login', [
      */
     public function __construct()
     {
