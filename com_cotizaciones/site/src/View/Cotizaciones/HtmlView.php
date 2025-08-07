@@ -73,6 +73,13 @@ class HtmlView extends BaseHtmlView
      */
     public function display($tpl = null)
     {
+        $app = Factory::getApplication();
+        
+        // Ensure app is available
+        if (!$app) {
+            throw new \Exception('Application not available');
+        }
+        
         try {
             $this->items = $this->get('Items');
             $this->pagination = $this->get('Pagination');
@@ -84,6 +91,11 @@ class HtmlView extends BaseHtmlView
                 $this->items = [];
             }
             
+            // Ensure state is always available
+            if (!$this->state) {
+                $this->state = new \Joomla\Registry\Registry();
+            }
+            
         } catch (Exception $e) {
             // If there's an error getting items, set empty defaults
             $this->items = [];
@@ -92,13 +104,13 @@ class HtmlView extends BaseHtmlView
             $this->params = ComponentHelper::getParams('com_cotizaciones');
             
             // Log the error for debugging
-            Factory::getApplication()->enqueueMessage('Error loading quotes: ' . $e->getMessage(), 'error');
+            $app->enqueueMessage('Error loading quotes: ' . $e->getMessage(), 'error');
         }
 
         // Check for errors.
         if (count($errors = $this->get('Errors'))) {
             foreach ($errors as $error) {
-                Factory::getApplication()->enqueueMessage('Model error: ' . $error, 'error');
+                $app->enqueueMessage('Model error: ' . $error, 'error');
             }
             $this->items = [];
             $this->pagination = null;

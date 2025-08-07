@@ -18,6 +18,7 @@ use Joomla\CMS\Factory;
 HTMLHelper::_('bootstrap.framework');
 
 $user = Factory::getUser();
+$app = Factory::getApplication();
 
 // Safe function to escape strings
 function safeEscape($value, $default = '') {
@@ -29,7 +30,7 @@ function safeEscape($value, $default = '') {
 
 // Safe function to get array value
 function safeGet($array, $key, $default = '') {
-    if (is_array($array) && isset($array[$key])) {
+    if (is_array($array) && array_key_exists($key, $array)) {
         return $array[$key];
     }
     return $default;
@@ -37,7 +38,7 @@ function safeGet($array, $key, $default = '') {
 
 // Function to get state badge class
 function getStateBadgeClass($state) {
-    switch($state) {
+    switch (trim($state)) {
         case 'draft': return 'bg-secondary';
         case 'sent': return 'bg-info';
         case 'sale': return 'bg-success';
@@ -49,7 +50,7 @@ function getStateBadgeClass($state) {
 
 // Function to get state label
 function getStateLabel($state) {
-    switch($state) {
+    switch (trim($state)) {
         case 'draft': return 'Borrador';
         case 'sent': return 'Enviada';
         case 'sale': return 'Confirmada';
@@ -82,20 +83,24 @@ function getStateLabel($state) {
                             <i class="fas fa-search"></i>
                         </span>
                         <input type="text" name="filter_search" id="filter_search" 
-                               value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" 
+                               value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" 
                                class="form-control" 
                                placeholder="Buscar por nombre de cliente..." />
                         <button class="btn btn-outline-secondary" type="submit">
                             Buscar
                         </button>
-                        <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
+                        <?php 
+                        $hasSearch = isset($this->state) && !empty($this->state->get('filter.search', ''));
+                        $hasStateFilter = isset($this->state) && !empty($this->state->get('filter.state', ''));
+                        if ($hasSearch || $hasStateFilter): 
+                        ?>
                             <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
                                class="btn btn-outline-warning" title="Limpiar búsqueda">
                                 <i class="fas fa-times"></i>
                             </a>
                         <?php endif; ?>
                     </div>
-                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($this->state->get('filter.state', '')); ?>" />
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.state', '') : ''); ?>" />
                     <input type="hidden" name="task" value="" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
@@ -108,15 +113,16 @@ function getStateLabel($state) {
                         </span>
                         <select name="filter_state" class="form-select" onchange="this.form.submit()">
                             <option value="">Todos los Estados</option>
-                            <option value="draft" <?php echo ($this->state->get('filter.state', '') == 'draft') ? 'selected' : ''; ?>>Borrador</option>
-                            <option value="sent" <?php echo ($this->state->get('filter.state', '') == 'sent') ? 'selected' : ''; ?>>Enviada</option>
-                            <option value="sale" <?php echo ($this->state->get('filter.state', '') == 'sale') ? 'selected' : ''; ?>>Confirmada</option>
-                            <option value="done" <?php echo ($this->state->get('filter.state', '') == 'done') ? 'selected' : ''; ?>>Completada</option>
-                            <option value="cancel" <?php echo ($this->state->get('filter.state', '') == 'cancel') ? 'selected' : ''; ?>>Cancelada</option>
+                            <?php $currentState = isset($this->state) ? $this->state->get('filter.state', '') : ''; ?>
+                            <option value="draft" <?php echo ($currentState == 'draft') ? 'selected' : ''; ?>>Borrador</option>
+                            <option value="sent" <?php echo ($currentState == 'sent') ? 'selected' : ''; ?>>Enviada</option>
+                            <option value="sale" <?php echo ($currentState == 'sale') ? 'selected' : ''; ?>>Confirmada</option>
+                            <option value="done" <?php echo ($currentState == 'done') ? 'selected' : ''; ?>>Completada</option>
+                            <option value="cancel" <?php echo ($currentState == 'cancel') ? 'selected' : ''; ?>>Cancelada</option>
                         </select>
                     </div>
                     <input type="hidden" name="task" value="" />
-                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
@@ -127,14 +133,15 @@ function getStateLabel($state) {
                             <i class="fas fa-list"></i>
                         </span>
                         <select name="limit" class="form-select" onchange="this.form.submit()">
-                            <option value="20" <?php echo ($this->state->get('list.limit', 20) == 20) ? 'selected' : ''; ?>>20 por página</option>
-                            <option value="30" <?php echo ($this->state->get('list.limit', 20) == 30) ? 'selected' : ''; ?>>30 por página</option>
-                            <option value="50" <?php echo ($this->state->get('list.limit', 20) == 50) ? 'selected' : ''; ?>>50 por página</option>
+                            <?php $currentLimit = isset($this->state) ? $this->state->get('list.limit', 20) : 20; ?>
+                            <option value="20" <?php echo ($currentLimit == 20) ? 'selected' : ''; ?>>20 por página</option>
+                            <option value="30" <?php echo ($currentLimit == 30) ? 'selected' : ''; ?>>30 por página</option>
+                            <option value="50" <?php echo ($currentLimit == 50) ? 'selected' : ''; ?>>50 por página</option>
                         </select>
                     </div>
                     <input type="hidden" name="task" value="" />
-                    <input type="hidden" name="filter_search" value="<?php echo safeEscape($this->state->get('filter.search', '')); ?>" />
-                    <input type="hidden" name="filter_state" value="<?php echo safeEscape($this->state->get('filter.state', '')); ?>" />
+                    <input type="hidden" name="filter_search" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.search', '') : ''); ?>" />
+                    <input type="hidden" name="filter_state" value="<?php echo safeEscape(isset($this->state) ? $this->state->get('filter.state', '') : ''); ?>" />
                     <?php echo HTMLHelper::_('form.token'); ?>
                 </form>
             </div>
@@ -151,17 +158,17 @@ function getStateLabel($state) {
             </div>
         </div>
         
-        <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
+        <?php if ($hasSearch || $hasStateFilter): ?>
             <div class="row mt-3">
                 <div class="col-12">
                     <div class="alert alert-info mb-0">
                         <i class="fas fa-filter"></i> 
                         Filtros activos:
-                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                        <?php if ($hasSearch): ?>
                             <strong>Búsqueda:</strong> "<?php echo safeEscape($this->state->get('filter.search', '')); ?>"
                         <?php endif; ?>
-                        <?php if (!empty($this->state->get('filter.state', ''))): ?>
-                            <?php if (!empty($this->state->get('filter.search', ''))): ?> | <?php endif; ?>
+                        <?php if ($hasStateFilter): ?>
+                            <?php if ($hasSearch): ?> | <?php endif; ?>
                             <strong>Estado:</strong> <?php echo getStateLabel($this->state->get('filter.state', '')); ?>
                         <?php endif; ?>
                         <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizaciones'); ?>" 
@@ -172,23 +179,22 @@ function getStateLabel($state) {
                 </div>
             </div>
         <?php endif; ?>
-        
     </div>
 
     <!-- Quotes Table -->
     <div class="quotes-table-container">
         <?php if (empty($this->items) || !is_array($this->items)): ?>
-            <?php if (!empty($this->state->get('filter.search', '')) || !empty($this->state->get('filter.state', ''))): ?>
+            <?php if ($hasSearch || $hasStateFilter): ?>
                 <div class="alert alert-warning">
                     <h4><i class="fas fa-search"></i> No se Encontraron Resultados</h4>
                     <p>No se encontraron cotizaciones que coincidan con los filtros aplicados.</p>
                     <p>Intenta con:</p>
                     <ul>
-                        <?php if (!empty($this->state->get('filter.search', ''))): ?>
+                        <?php if ($hasSearch): ?>
                             <li>Verificar la ortografía del nombre del cliente</li>
                             <li>Usar términos de búsqueda más generales</li>
                         <?php endif; ?>
-                        <?php if (!empty($this->state->get('filter.state', ''))): ?>
+                        <?php if ($hasStateFilter): ?>
                             <li>Seleccionar un estado diferente</li>
                         <?php endif; ?>
                         <li>Limpiar todos los filtros</li>
@@ -226,7 +232,7 @@ function getStateLabel($state) {
                             <td>
                                 <div class="quote-name">
                                     <strong>
-                                        <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int)safeGet($item, 'id', 0)); ?>" 
+                                        <a href="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int) safeGet($item, 'id', 0)); ?>" 
                                            class="text-decoration-none text-dark">
                                             <?php echo safeEscape(safeGet($item, 'name'), 'Sin número'); ?>
                                         </a>
@@ -236,7 +242,7 @@ function getStateLabel($state) {
                             <td>
                                 <?php 
                                 $contactName = safeGet($item, 'contact_name');
-                                if (!empty($contactName)): 
+                                if (!empty($contactName) && $contactName !== 'Cliente no disponible'): 
                                 ?>
                                     <strong><?php echo safeEscape($contactName); ?></strong>
                                 <?php else: ?>
@@ -246,7 +252,7 @@ function getStateLabel($state) {
                             <td>
                                 <?php 
                                 $dateOrder = safeGet($item, 'date_order');
-                                if (!empty($dateOrder)): 
+                                if (!empty($dateOrder) && $dateOrder !== '0000-00-00'): 
                                 ?>
                                     <span class="date"><?php echo safeEscape(date('d/m/Y', strtotime($dateOrder))); ?></span>
                                 <?php else: ?>
@@ -256,9 +262,9 @@ function getStateLabel($state) {
                             <td>
                                 <?php 
                                 $total = safeGet($item, 'amount_total');
-                                if (!empty($total) && $total !== '0.00'): 
+                                if (!empty($total) && $total !== '0.00' && is_numeric($total)): 
                                 ?>
-                                    <span class="currency">Q <?php echo number_format((float)$total, 2); ?></span>
+                                    <span class="currency">Q <?php echo number_format((float) $total, 2); ?></span>
                                 <?php else: ?>
                                     <span class="text-muted">Q 0.00</span>
                                 <?php endif; ?>

@@ -135,6 +135,11 @@ class CotizacionesModel extends ListModel
     {
         $app = Factory::getApplication();
         
+        // Ensure app is available
+        if (!$app) {
+            return;
+        }
+        
         // Get the pagination request variables
         $limit = $app->getUserStateFromRequest('global.list.limit', 'limit', $app->get('list_limit'), 'uint');
         $this->setState('list.limit', $limit);
