@@ -423,9 +423,10 @@ class OdooHelper
         try {
             $domain = [['is_company', '=', true]];
             
-            // TODO: Add sales agent filter when we know the correct field name
-            // The field x_studio_agente_de_ventas_1 exists in sale.order but we need
-            // to know what field in res.partner stores the sales agent
+            // Filter by sales agent using the correct field
+            if (!empty($salesAgent)) {
+                $domain[] = ['x_studio_agente_de_ventas', '=', $salesAgent];
+            }
             
             if (!empty($search)) {
                 $domain[] = ['name', 'ilike', $search];
