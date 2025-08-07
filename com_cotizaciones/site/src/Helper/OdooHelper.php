@@ -245,27 +245,14 @@ class OdooHelper
     }
 
     /**
-     * Authenticate with Odoo
+     * Get user ID from configuration
      *
-     * @return  integer  User ID
-     * @throws  Exception
+     * @return  integer  User ID from config
      */
-    private function authenticate()
+    private function getUserId()
     {
         $config = $this->getConfig();
-        
-        $uid = $this->callOdoo('common', 'authenticate', [
-            $config['database'],
-            $config['username'],
-            $config['password'],
-            []
-        ]);
-        
-        if (!$uid) {
-            throw new \Exception('Authentication failed');
-        }
-        
-        return $uid;
+        return (int) $config['user_id'];
     }
 
     /**
@@ -282,7 +269,7 @@ class OdooHelper
     public function getQuotesByAgent($agentName, $page = 1, $limit = 20, $search = '', $state = '')
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             // Build domain
@@ -357,7 +344,7 @@ class OdooHelper
     public function getQuote($quoteId)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $quotes = $this->callOdoo('object', 'execute_kw', [
@@ -403,7 +390,7 @@ class OdooHelper
     public function getClients($searchTerm, $agentName)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             // Search for clients with exact match
@@ -454,7 +441,7 @@ class OdooHelper
     public function getClientById($clientId)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $clients = $this->callOdoo('object', 'execute_kw', [
@@ -485,7 +472,7 @@ class OdooHelper
     public function createQuote($data)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $quoteData = [
@@ -523,7 +510,7 @@ class OdooHelper
     public function updateQuote($quoteId, $data)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $updateData = [];
@@ -567,7 +554,7 @@ class OdooHelper
     public function getQuoteLines($quoteId)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             // Search for quote lines
@@ -626,7 +613,7 @@ class OdooHelper
     public function createQuoteLine($quoteId, $productName, $description, $quantity, $price)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             // First create a product
@@ -682,7 +669,7 @@ class OdooHelper
     public function updateQuoteLine($lineId, $description, $quantity, $price)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $result = $this->callOdoo('object', 'execute_kw', [
@@ -716,7 +703,7 @@ class OdooHelper
     public function deleteQuoteLine($lineId)
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             $config = $this->getConfig();
             
             $result = $this->callOdoo('object', 'execute_kw', [
@@ -744,7 +731,7 @@ class OdooHelper
     public function getConnectionStatus()
     {
         try {
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             // Test a simple call to verify connection
             $config = $this->getConfig();
@@ -782,6 +769,7 @@ class OdooHelper
     public function getConnectionDiagnostics()
     {
         $config = $this->getConfig();
+        $uid = $this->getUserId();
         
         $diagnostics = [
             'config' => [
@@ -799,10 +787,9 @@ class OdooHelper
         ];
         
         try {
-            // Test authentication
-            $diagnostics['step'] = 'authentication';
-            $uid = $this->authenticate();
-            $diagnostics['tests']['authentication'] = true;
+            // Test basic connection
+            $diagnostics['step'] = 'basic_connection';
+            $diagnostics['tests']['basic_connection'] = true;
             $diagnostics['tests']['uid'] = $uid;
             
             // Test a simple call
@@ -822,7 +809,7 @@ class OdooHelper
             $diagnostics['success'] = true;
             
         } catch (\Exception $e) {
-            $diagnostics['tests']['authentication'] = false;
+            $diagnostics['tests']['basic_connection'] = false;
             $diagnostics['errors'][] = $e->getMessage();
             $diagnostics['success'] = false;
         }
