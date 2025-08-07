@@ -405,10 +405,11 @@ class OdooHelper
             $config = $this->getConfig();
             $uid = $this->authenticate();
             
-            // Search for clients with case-insensitive partial match
+            // Search for clients with case-insensitive partial match and filter by sales agent
             $domain = [
                 ['name', 'ilike', trim($searchTerm)],
-                ['is_company', '=', true]
+                ['is_company', '=', true],
+                ['x_studio_agente_de_ventas', '=', $agentName]
             ];
             
             $clientIds = $this->callOdoo('object', 'execute_kw', [
@@ -432,7 +433,7 @@ class OdooHelper
                 'res.partner',
                 'read',
                 [$clientIds],
-                ['fields' => ['id', 'name', 'email', 'phone']]
+                ['fields' => ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas']]
             ]);
             
             return $clients;

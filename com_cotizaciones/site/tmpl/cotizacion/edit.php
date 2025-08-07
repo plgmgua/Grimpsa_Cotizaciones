@@ -147,11 +147,15 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                 <input type="hidden" name="jform[partner_id]" value="<?php echo isset($selectedClient['id']) ? (int)$selectedClient['id'] : 0; ?>" required />
                                             <?php else: ?>
                                                 <!-- Client Search Form -->
+                                                <div class="alert alert-info mb-2">
+                                                    <i class="fas fa-info-circle"></i>
+                                                    <small>La búsqueda de clientes está filtrada por su agente de ventas: <strong><?php echo htmlspecialchars($user->name); ?></strong></small>
+                                                </div>
                                                 <form method="post" class="mb-2">
                                                     <div class="input-group">
                                                         <input type="text" name="client_search" class="form-control" 
                                                                value="<?php echo htmlspecialchars($clientSearch); ?>"
-                                                               placeholder="Buscar cliente por nombre (no importa mayúsculas/minúsculas)..." 
+                                                               placeholder="Buscar cliente por nombre (filtrado por su agente de ventas)..." 
                                                                minlength="2" />
                                                         <button type="submit" class="btn btn-outline-primary">
                                                             <i class="fas fa-search"></i> Buscar
@@ -170,7 +174,7 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                         <div class="alert alert-warning">
                                                             <i class="fas fa-exclamation-triangle"></i>
                                                             No se encontraron clientes que contengan "<?php echo htmlspecialchars($clientSearch); ?>" en su nombre
-                                                            <br><small class="text-muted">La búsqueda no distingue entre mayúsculas y minúsculas y busca coincidencias parciales</small>
+                                                            <br><small class="text-muted">La búsqueda no distingue entre mayúsculas y minúsculas, busca coincidencias parciales y está filtrada por su agente de ventas</small>
                                                         </div>
                                                     <?php else: ?>
                                                         <div class="card">
