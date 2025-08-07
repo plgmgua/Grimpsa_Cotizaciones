@@ -418,73 +418,40 @@ class OdooHelper
      *
      * @return  array   Array of clients
      */
-    public function getClients($search = '', $salesAgent = '')
+    public function getClients($searchTerm = '', $agentName = '', $limit = 50)
     {
         try {
-            $app = Factory::getApplication();
+            $domain = [];
             
-            // Ensure app is available for debugging
-            if (!$app) {
+            if (!empty($agentName)) {
+                $domain[] = ['x_studio_agente_de_ventas_1', '=', $agentName];
+            }
+            
+            if (!empty($searchTerm)) {
+                // Use ilike for case-insensitive search with partial matching
+                $domain[] = ['name', 'ilike', '%' . trim($searchTerm) . '%'];
+            }
+
+            $clientIds = $this->callOdoo('search', [
+                'res.partner',
+                $domain,
+                ['limit' => $limit, 'order' => 'name asc']
+            ]);
+
+            if (!is_array($clientIds) || empty($clientIds)) {
                 return [];
             }
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage("Searching clients with search='$search' and salesAgent='$salesAgent'", 'info');
-            }
-            
-            $domain = [['is_company', '=', true]];
-            
-            // Filter by sales agent using the correct field
-            if (!empty($salesAgent)) {
-                $domain[] = ['x_studio_agente_de_ventas', '=', $salesAgent];
-            }
-            
-            if (!empty($search)) {
-                $domain[] = ['name', 'ilike', $search];
-                $domain[] = ['name', 'ilike', '%' . $searchTerm . '%'];
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Client search domain: ' . print_r($domain, true), 'info');
-            }
-            
-            $clients = $this->odooCall('res.partner', 'search_read', $domain,
-                ['id', 'name', 'email', 'phone'],
-                ['limit' => 100, 'order' => 'name asc']
-            );
-                0,      // offset
-                100,    // limit
-                'name asc'  // order by name ascending
-            }
-            
-            if ($clients === false || !is_array($clients)) {
-                if ($this->debug) {
-                    Factory::getApplication()->enqueueMessage('Clients result is not an array: ' . gettype($clients), 'warning');
-                }
-                return [];
-            }
-            
-            // Validate each client record
-            $validClients = [];
-            foreach ($clients as $client) {
-                if (is_array($client) && isset($client['id']) && isset($client['name'])) {
-                    $validClients[] = $client;
-                } else {
-                    if ($this->debug) {
-                        Factory::getApplication()->enqueueMessage('Invalid client record: ' . print_r($client, true), 'warning');
-                    }
-                }
-            }
-            
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Valid clients count: ' . count($validClients), 'info');
-            }
-            
-            return $validClients;
+
+            $clients = $this->callOdoo('read', [
+                'res.partner',
+                $clientIds,
+                ['id', 'name', 'email', 'phone']
+            ]);
+
+            return is_array($clients) ? $clients : [];
             
         } catch (Exception $e) {
-            if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Error getting clients: ' . $e->getMessage(), 'error');
-            }
+            Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'error');
             return [];
         }
     }

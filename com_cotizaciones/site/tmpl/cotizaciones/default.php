@@ -16,14 +16,14 @@ use Joomla\CMS\Factory;
 
 HTMLHelper::_('bootstrap.framework');
 
-$app = Factory::getApplication();
 $user = Factory::getUser();
+$app = Factory::getApplication();
 
-// Initialize variables with safe defaults
-$items = isset($this->items) && is_array($this->items) ? $this->items : array();
+// Safe defaults
+$items = isset($this->items) && is_array($this->items) ? $this->items : [];
 $state = isset($this->state) ? $this->state : null;
 
-// Get filter values safely
+// Get filter values
 $currentSearch = '';
 $currentState = '';
 $currentLimit = 20;
@@ -37,22 +37,22 @@ if ($state) {
 $hasSearch = !empty($currentSearch);
 $hasStateFilter = !empty($currentState);
 
-// State mapping
-$stateLabels = array(
+// State mappings
+$stateLabels = [
     'draft' => 'Borrador',
     'sent' => 'Enviada', 
     'sale' => 'Confirmada',
     'done' => 'Completada',
     'cancel' => 'Cancelada'
-);
+];
 
-$stateBadges = array(
+$stateBadges = [
     'draft' => 'bg-secondary',
     'sent' => 'bg-info',
     'sale' => 'bg-success', 
     'done' => 'bg-primary',
     'cancel' => 'bg-danger'
-);
+];
 ?>
 
 <div class="cotizaciones-component">
