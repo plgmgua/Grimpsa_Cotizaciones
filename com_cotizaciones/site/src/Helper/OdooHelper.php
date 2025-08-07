@@ -258,7 +258,6 @@ class OdooHelper
             $config['username'],
             $config['password'],
             []
-            []
         ]);
         
         if (!$uid) {
@@ -290,7 +289,7 @@ class OdooHelper
                 ['x_studio_agente_de_ventas_1', '=', $agentName]
             ];
             
-            // Add search filter - CASE INSENSITIVE PARTIAL MATCH
+            // Add search filter
             if (!empty($search)) {
                 $domain[] = ['partner_id', 'ilike', trim($search)];
             }
@@ -393,7 +392,7 @@ class OdooHelper
     }
 
     /**
-     * Get clients for search - CASE INSENSITIVE PARTIAL MATCH
+     * Get clients for search
      *
      * @param   string  $searchTerm  Search term
      * @param   string  $agentName   Sales agent name
@@ -406,7 +405,7 @@ class OdooHelper
             $config = $this->getConfig();
             $uid = $this->authenticate();
             
-            // Search for clients with partial name match (case insensitive)
+            // Search for clients with case-insensitive partial match
             $domain = [
                 ['name', 'ilike', trim($searchTerm)],
                 ['is_company', '=', true]
