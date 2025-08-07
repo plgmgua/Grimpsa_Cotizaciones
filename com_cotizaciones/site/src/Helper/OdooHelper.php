@@ -452,6 +452,35 @@ class OdooHelper
     }
 
     /**
+     * Get a single client by ID
+     *
+     * @param   integer  $clientId  The client ID
+     *
+     * @return  array|false  Client data or false
+     */
+    public function getClientById($clientId)
+    {
+        try {
+            $clients = $this->odooCall('res.partner', 'search_read',
+                [['id', '=', $clientId]],
+                ['id', 'name', 'email', 'phone']
+            );
+            
+            if ($clients && is_array($clients) && count($clients) > 0) {
+                return $clients[0];
+            }
+            
+            return false;
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error getting client: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
      * Create a quote line in Odoo
      *
      * @param   integer  $quoteId      The quote ID

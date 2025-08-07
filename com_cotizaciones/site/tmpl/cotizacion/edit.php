@@ -84,26 +84,109 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                                 Cliente *
                                             </label>
                                             
-                                            <!-- Client Search Input -->
-                                            <input type="text" id="client_search" class="form-control" 
-                                                   placeholder="Buscar cliente por nombre..." 
-                                                   autocomplete="off" />
-                                            <div id="client_results" class="client-results" style="display: none;"></div>
+                                            <?php 
+                                            // Get search term and clients
+                                            $clientSearch = Factory::getApplication()->input->getString('client_search', '');
+                                            $selectedClientId = Factory::getApplication()->input->getInt('selected_client_id', 0);
+                                            $clients = [];
+                                            $selectedClient = null;
                                             
-                                            <!-- Hidden field for selected client -->
-                                            <input type="hidden" name="jform[partner_id]" id="jform_partner_id" required />
+                                            // If we have a selected client, get its info
+                                            if ($selectedClientId > 0) {
+                                                try {
+                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+                                                    $clientInfo = $helper->getClientById($selectedClientId);
+                                                    if ($clientInfo) {
+                                                        $selectedClient = $clientInfo;
+                                                    }
+                                                } catch (Exception $e) {
+                                                    // Ignore error, will show search form
+                                                }
+                                            }
                                             
-                                            <!-- Selected client display -->
-                                            <div id="selected_client" class="selected-client" style="display: none;">
+                                            // If we have a search term, get matching clients
+                                            if (!empty($clientSearch) && strlen($clientSearch) >= 2) {
+                                                try {
+                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
+                                                    $clients = $helper->getClients($clientSearch, $user->name);
+                                                } catch (Exception $e) {
+                                                    Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'warning');
+                                                }
+                                            }
+                                            ?>
+                                            
+                                            <?php if ($selectedClient): ?>
+                                                <!-- Selected Client Display -->
                                                 <div class="alert alert-success">
-                                                    <strong>Cliente seleccionado:</strong> <span id="selected_client_name"></span>
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="clearClientSelection()">
-                                                        Cambiar
-                                                    </button>
+                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars($selectedClient['name']); ?>
+                                                    <form method="post" style="display: inline;" class="ms-2">
+                                                        <button type="submit" name="clear_client" value="1" class="btn btn-sm btn-outline-secondary">
+                                                            Cambiar Cliente
+                                                        </button>
+                                                        <?php echo HTMLHelper::_('form.token'); ?>
+                                                    </form>
                                                 </div>
-                                            </div>
+                                                <input type="hidden" name="jform[partner_id]" value="<?php echo $selectedClient['id']; ?>" required />
+                                            <?php else: ?>
+                                                <!-- Client Search Form -->
+                                                <form method="post" class="mb-2">
+                                                    <div class="input-group">
+                                                        <input type="text" name="client_search" class="form-control" 
+                                                               value="<?php echo htmlspecialchars($clientSearch); ?>"
+                                                               placeholder="Buscar cliente por nombre..." 
+                                                               minlength="2" />
+                                                        <button type="submit" class="btn btn-outline-primary">
+                                                            <i class="fas fa-search"></i> Buscar
+                                                        </button>
+                                                        <?php if (!empty($clientSearch)): ?>
+                                                            <button type="submit" name="clear_search" value="1" class="btn btn-outline-secondary">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <?php echo HTMLHelper::_('form.token'); ?>
+                                                </form>
+                                                
+                                                <?php if (!empty($clientSearch)): ?>
+                                                    <?php if (empty($clients)): ?>
+                                                        <div class="alert alert-warning">
+                                                            <i class="fas fa-exclamation-triangle"></i>
+                                                            No se encontraron clientes con el término "<?php echo htmlspecialchars($clientSearch); ?>"
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <div class="card">
+                                                            <div class="card-header">
+                                                                <small>Resultados de búsqueda (<?php echo count($clients); ?> encontrados):</small>
+                                                            </div>
+                                                            <div class="card-body p-0">
+                                                                <div class="list-group list-group-flush">
+                                                                    <?php foreach ($clients as $client): ?>
+                                                                        <form method="post" style="display: inline;">
+                                                                            <button type="submit" name="selected_client_id" value="<?php echo $client['id']; ?>" 
+                                                                                    class="list-group-item list-group-item-action text-start">
+                                                                                <strong><?php echo htmlspecialchars($client['name']); ?></strong>
+                                                                                <?php if (!empty($client['email'])): ?>
+                                                                                    <br><small class="text-muted"><?php echo htmlspecialchars($client['email']); ?></small>
+                                                                                <?php endif; ?>
+                                                                            </button>
+                                                                            <?php echo HTMLHelper::_('form.token'); ?>
+                                                                        </form>
+                                                                    <?php endforeach; ?>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
+                                                
+                                                <!-- Hidden field for form validation -->
+                                                <input type="hidden" name="jform[partner_id]" value="" />
+                                            <?php endif; ?>
                                             
-                                            <small class="form-text text-muted">Escriba para buscar entre sus clientes asignados</small>
+                                            <small class="form-text text-muted">
+                                                <?php if (!$selectedClient): ?>
+                                                    Busque entre sus clientes asignados (mínimo 2 caracteres)
+                                                <?php endif; ?>
+                                            </small>
                                         <?php else: ?>
                                             <label for="jform_client_name" class="form-label">
                                                 Cliente
@@ -395,107 +478,3 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
         </div>
     </div>
 </div>
-
-<script>
-// Client search functionality
-let searchTimeout;
-const clientSearch = document.getElementById('client_search');
-const clientResults = document.getElementById('client_results');
-const partnerIdField = document.getElementById('jform_partner_id');
-const selectedClientDiv = document.getElementById('selected_client');
-const selectedClientName = document.getElementById('selected_client_name');
-
-if (clientSearch) {
-    clientSearch.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        const query = this.value.trim();
-        
-        if (query.length < 2) {
-            clientResults.style.display = 'none';
-            return;
-        }
-        
-        searchTimeout = setTimeout(() => {
-            searchClients(query);
-        }, 300);
-    });
-    
-    // Hide results when clicking outside
-    document.addEventListener('click', function(e) {
-        if (!clientSearch.contains(e.target) && !clientResults.contains(e.target)) {
-            clientResults.style.display = 'none';
-        }
-    });
-}
-
-function searchClients(query) {
-    // Show loading
-    clientResults.innerHTML = '<div class="client-result-item">Buscando...</div>';
-    clientResults.style.display = 'block';
-    
-    // Make AJAX request to search clients
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'index.php?option=com_cotizaciones&task=cotizacion.searchClients', true);
-    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-    
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4) {
-            if (xhr.status === 200) {
-                try {
-                    const response = JSON.parse(xhr.responseText);
-                    displayClientResults(response.clients || []);
-                } catch (e) {
-                    clientResults.innerHTML = '<div class="client-result-item text-danger">Error en la búsqueda</div>';
-                }
-            } else {
-                clientResults.innerHTML = '<div class="client-result-item text-danger">Error de conexión</div>';
-            }
-        }
-    };
-    
-    const formData = 'search=' + encodeURIComponent(query) + '&' + 
-                     document.querySelector('input[name="' + token + '"]').name + '=' + 
-                     document.querySelector('input[name="' + token + '"]').value;
-    
-    xhr.send(formData);
-}
-
-function displayClientResults(clients) {
-    if (clients.length === 0) {
-        clientResults.innerHTML = '<div class="client-result-item text-muted">No se encontraron clientes</div>';
-        return;
-    }
-    
-    let html = '';
-    clients.forEach(client => {
-        html += `<div class="client-result-item" onclick="selectClient(${client.id}, '${client.name.replace(/'/g, "\\'")}')">
-            <strong>${client.name}</strong>
-            ${client.email ? '<br><small class="text-muted">' + client.email + '</small>' : ''}
-        </div>`;
-    });
-    
-    clientResults.innerHTML = html;
-}
-
-function selectClient(id, name) {
-    partnerIdField.value = id;
-    selectedClientName.textContent = name;
-    
-    // Hide search and show selected
-    clientSearch.style.display = 'none';
-    clientResults.style.display = 'none';
-    selectedClientDiv.style.display = 'block';
-}
-
-function clearClientSelection() {
-    partnerIdField.value = '';
-    clientSearch.value = '';
-    clientSearch.style.display = 'block';
-    selectedClientDiv.style.display = 'none';
-    clientSearch.focus();
-}
-
-// Get CSRF token
-const token = document.querySelector('input[name*="token"]').name;
-</script>
