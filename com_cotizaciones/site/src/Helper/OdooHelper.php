@@ -253,10 +253,11 @@ class OdooHelper
     {
         $config = $this->getConfig();
         
-        $uid = $this->callOdoo('common', 'login', [
+        $uid = $this->callOdoo('common', 'authenticate', [
             $config['database'],
             $config['username'],
             $config['password'],
+            []
         ]);
         
         if (!$uid) {
