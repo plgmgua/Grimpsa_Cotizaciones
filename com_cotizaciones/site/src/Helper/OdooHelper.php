@@ -84,6 +84,35 @@ class OdooHelper
     }
 
     /**
+     * Get client by ID
+     *
+     * @param   integer  $clientId  Client ID
+     *
+     * @return  array|false  Client data or false
+     */
+    public function getClientById($clientId)
+    {
+        try {
+            $clients = $this->odooCall('res.partner', 'search_read',
+                [['id', '=', $clientId]],
+                ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas']
+            );
+            
+            if ($clients === false || !is_array($clients) || empty($clients)) {
+                return false;
+            }
+            
+            return $clients[0];
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Error getting client: ' . $e->getMessage(), 'error');
+            }
+            return false;
+        }
+    }
+
+    /**
      * Get quotes by sales agent using the working XML-RPC format
      *
      * @param   string   $agentName  The sales agent name
