@@ -18,6 +18,9 @@ use Joomla\CMS\Session\Session;
 HTMLHelper::_('bootstrap.framework');
 HTMLHelper::_('behavior.formvalidator');
 
+// Get application instance safely
+$app = Factory::getApplication();
+
 // Safe function to get object property
 function safeGet($obj, $property, $default = '') {
     if (is_object($obj) && property_exists($obj, $property)) {
@@ -86,15 +89,15 @@ $editLineId = Factory::getApplication()->input->getInt('edit_line_id', 0);
                                             
                                             <?php 
                                             // Clear client selection
-                                            if ($app->input->post->get('clear_client')) {
+                                            if ($app && $app->input->post->get('clear_client')) {
                                                 // Redirect to clear the POST data
                                                 $app->redirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0'));
                                                 return;
                                             }
                                             
                                             // Get search term and clients
-                                            $clientSearch = Factory::getApplication()->input->getString('client_search', '');
-                                            $selectedClientId = Factory::getApplication()->input->getInt('selected_client_id', 0);
+                                            $clientSearch = $app ? $app->input->getString('client_search', '') : '';
+                                            $selectedClientId = $app ? $app->input->getInt('selected_client_id', 0) : 0;
                                             $clients = array();
                                             $selectedClient = null;
                                             
