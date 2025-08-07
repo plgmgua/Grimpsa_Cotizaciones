@@ -245,14 +245,27 @@ class OdooHelper
     }
 
     /**
-     * Get user ID from configuration (no separate authentication needed)
+     * Authenticate with Odoo
      *
-     * @return  integer  User ID from config
+     * @return  integer  User ID
+     * @throws  Exception
      */
-    private function getUserId()
+    private function authenticate()
     {
         $config = $this->getConfig();
-        return 2; // Use hardcoded user ID as shown in your XML example
+        
+        $uid = $this->callOdoo('common', 'authenticate', [
+            $config['database'],
+            $config['username'],
+            $config['password'],
+            []
+        ]);
+        
+        if (!$uid) {
+            throw new \Exception('Authentication failed');
+        }
+        
+        return $uid;
     }
 
     /**
@@ -269,8 +282,8 @@ class OdooHelper
     public function getQuotesByAgent($agentName, $page = 1, $limit = 20, $search = '', $state = '')
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             // Build domain
             $domain = [
@@ -344,8 +357,8 @@ class OdooHelper
     public function getQuote($quoteId)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $quotes = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -390,12 +403,12 @@ class OdooHelper
     public function getClients($searchTerm, $agentName)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             // Search for clients with case-insensitive partial match
             $domain = [
-                ['name', '=', $searchTerm],
+                ['name', 'ilike', trim($searchTerm)],
                 ['is_company', '=', true]
             ];
             
@@ -441,8 +454,8 @@ class OdooHelper
     public function getClientById($clientId)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $clients = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -472,8 +485,8 @@ class OdooHelper
     public function createQuote($data)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $quoteData = [
                 'partner_id' => (int) $data['partner_id'],
@@ -510,8 +523,8 @@ class OdooHelper
     public function updateQuote($quoteId, $data)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $updateData = [];
             
@@ -554,8 +567,8 @@ class OdooHelper
     public function getQuoteLines($quoteId)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             // Search for quote lines
             $lineIds = $this->callOdoo('object', 'execute_kw', [
@@ -613,8 +626,8 @@ class OdooHelper
     public function createQuoteLine($quoteId, $productName, $description, $quantity, $price)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             // First create a product
             $productId = $this->callOdoo('object', 'execute_kw', [
@@ -669,8 +682,8 @@ class OdooHelper
     public function updateQuoteLine($lineId, $description, $quantity, $price)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $result = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -703,8 +716,8 @@ class OdooHelper
     public function deleteQuoteLine($lineId)
     {
         try {
+            $uid = $this->authenticate();
             $config = $this->getConfig();
-            $uid = $this->getUserId();
             
             $result = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -731,10 +744,10 @@ class OdooHelper
     public function getConnectionStatus()
     {
         try {
-            $config = $this->getConfig();
-            $uid = $this->getUserId();
+            $uid = $this->authenticate();
             
             // Test a simple call to verify connection
+            $config = $this->getConfig();
             $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
                 $uid,
@@ -787,10 +800,14 @@ class OdooHelper
         
         try {
             // Test authentication
-            $diagnostics['step'] = 'connection_test';
-            $uid = $this->getUserId();
+            $diagnostics['step'] = 'authentication';
+            $uid = $this->authenticate();
+            $diagnostics['tests']['authentication'] = true;
+            $diagnostics['tests']['uid'] = $uid;
             
             // Test a simple call
+            $diagnostics['step'] = 'quote_search';
+            $config = $this->getConfig();
             $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
                 $uid,
@@ -801,12 +818,11 @@ class OdooHelper
                 ['limit' => 1]
             ]);
             
-            $diagnostics['tests']['connection_test'] = true;
-            $diagnostics['tests']['uid'] = $uid;
+            $diagnostics['tests']['quote_search'] = true;
             $diagnostics['success'] = true;
             
         } catch (\Exception $e) {
-            $diagnostics['tests']['connection_test'] = false;
+            $diagnostics['tests']['authentication'] = false;
             $diagnostics['errors'][] = $e->getMessage();
             $diagnostics['success'] = false;
         }
