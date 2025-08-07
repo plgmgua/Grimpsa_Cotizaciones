@@ -253,11 +253,10 @@ class OdooHelper
     {
         $config = $this->getConfig();
         
-        $uid = $this->callOdoo('common', 'authenticate', [
+        $uid = $this->callOdoo('common', 'login', [
             $config['database'],
             $config['username'],
             $config['password'],
-            []
         ]);
         
         if (!$uid) {
@@ -291,7 +290,7 @@ class OdooHelper
             
             // Add search filter - CASE INSENSITIVE PARTIAL MATCH
             if (!empty($search)) {
-                $domain[] = ['partner_id.name', 'ilike', '%' . trim($search) . '%'];
+                $domain[] = ['partner_id', 'ilike', trim($search)];
             }
             
             // Add state filter
@@ -407,7 +406,7 @@ class OdooHelper
             
             // Search for clients with partial name match (case insensitive)
             $domain = [
-                ['name', 'ilike', '%' . trim($searchTerm) . '%'],
+                ['name', 'ilike', trim($searchTerm)],
                 ['is_company', '=', true]
             ];
             
