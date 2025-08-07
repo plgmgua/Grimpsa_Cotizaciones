@@ -59,15 +59,57 @@ class OdooHelper
                 $domain[] = ['name', 'ilike', $search];
             }
             
-            // Add sales agent filter if provided
+            // First try with sales agent filter
             if (!empty($agentName)) {
-                $domain[] = ['x_studio_agente_de_ventas', '=', $agentName];
+                $filteredDomain = $domain;
+                $filteredDomain[] = ['x_studio_agente_de_ventas', '=', $agentName];
+                
+                $filteredClients = $this->odooCall('res.partner', 'search_read', $filteredDomain,
+                    ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
+                    ['limit' => 50, 'order' => 'name asc']
+                );
+                
+                // If we found enough clients with the filter, return them
+                if (is_array($filteredClients) && count($filteredClients) >= 3) {
+                    if ($this->debug) {
+                        Factory::getApplication()->enqueueMessage('Using filtered results: ' . count($filteredClients) . ' clients found', 'info');
+                    }
+                    return $filteredClients;
+                }
+                
+                // If we found very few clients, also include clients without sales agent assignment
+                if (is_array($filteredClients) && count($filteredClients) > 0) {
+                    // Get additional clients without sales agent assignment
+                    $unassignedDomain = $domain;
+                    $unassignedDomain[] = ['x_studio_agente_de_ventas', '=', false];
+                    
+                    $unassignedClients = $this->odooCall('res.partner', 'search_read', $unassignedDomain,
+                        ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
+                        ['limit' => 20, 'order' => 'name asc']
+                    );
+                    
+                    if (is_array($unassignedClients)) {
+                        $allClients = array_merge($filteredClients, $unassignedClients);
+                        if ($this->debug) {
+                            Factory::getApplication()->enqueueMessage('Combined results: ' . count($allClients) . ' clients (filtered + unassigned)', 'info');
+                        }
+                        return $allClients;
+                    }
+                    
+                    return $filteredClients;
+                }
             }
             
+            // Fallback: get all clients without sales agent filter
             $clients = $this->odooCall('res.partner', 'search_read', $domain,
                 ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
                 ['limit' => 50, 'order' => 'name asc']
             );
+            
+            // Debug the results
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Fallback search - Found clients: ' . (is_array($clients) ? count($clients) : 'not array'), 'info');
+            }
             
             if ($clients === false || !is_array($clients)) {
                 return [];
@@ -1548,5 +1590,55 @@ class OdooHelper
         
         // If it's just an ID, we don't have the name
         return 'Producto ID: ' . $productId;
+    }
+
+    /**
+     * Test method to get all clients without sales agent filtering
+     * This is for debugging purposes only
+     *
+     * @param   string  $search  Search term for client name
+     *
+     * @return  array   Array of clients
+     */
+    public function getAllClients($search = '')
+    {
+        try {
+            $domain = [['is_company', '=', true]];
+            
+            if (!empty($search)) {
+                $domain[] = ['name', 'ilike', $search];
+            }
+            
+            // Debug information
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('TEST - Search term: ' . $search, 'info');
+                Factory::getApplication()->enqueueMessage('TEST - Domain: ' . print_r($domain, true), 'info');
+            }
+            
+            $clients = $this->odooCall('res.partner', 'search_read', $domain,
+                ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
+                ['limit' => 50, 'order' => 'name asc']
+            );
+            
+            // Debug the results
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('TEST - Found clients: ' . (is_array($clients) ? count($clients) : 'not array'), 'info');
+                if (is_array($clients) && count($clients) > 0) {
+                    Factory::getApplication()->enqueueMessage('TEST - First client: ' . print_r($clients[0], true), 'info');
+                }
+            }
+            
+            if ($clients === false || !is_array($clients)) {
+                return [];
+            }
+            
+            return $clients;
+            
+        } catch (Exception $e) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('TEST - Error getting clients: ' . $e->getMessage(), 'error');
+            }
+            return [];
+        }
     }
 } 
