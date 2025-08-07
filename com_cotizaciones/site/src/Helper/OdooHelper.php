@@ -29,8 +29,9 @@ class OdooHelper
         $params = ComponentHelper::getParams('com_cotizaciones');
         
         return [
-            'base_url' => $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2'),
+            'base_url' => $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object'),
             'database' => $params->get('odoo_database', 'grupoimpre'),
+            'user_id' => $params->get('odoo_user_id', '2'),
             'username' => $params->get('odoo_username', 'admin'),
             'password' => $params->get('odoo_api_key', ''),
             'timeout' => $params->get('connection_timeout', 30),
@@ -244,27 +245,14 @@ class OdooHelper
     }
 
     /**
-     * Authenticate with Odoo
+     * Get user ID from configuration (no separate authentication needed)
      *
-     * @return  integer  User ID
-     * @throws  Exception
+     * @return  integer  User ID from config
      */
-    private function authenticate()
+    private function getUserId()
     {
         $config = $this->getConfig();
-        
-        $uid = $this->callOdoo('common', 'authenticate', [
-            $config['database'],
-            $config['username'],
-            $config['password'],
-            []
-        ]);
-        
-        if (!$uid) {
-            throw new \Exception('Authentication failed');
-        }
-        
-        return $uid;
+        return (int) $config['user_id']; // Use user_id from config instead of authenticating
     }
 
     /**
@@ -282,7 +270,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             // Build domain
             $domain = [
@@ -357,7 +345,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $quotes = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -403,7 +391,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             // Search for clients with case-insensitive partial match
             $domain = [
@@ -454,7 +442,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $clients = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -485,7 +473,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $quoteData = [
                 'partner_id' => (int) $data['partner_id'],
@@ -523,7 +511,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $updateData = [];
             
@@ -567,7 +555,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             // Search for quote lines
             $lineIds = $this->callOdoo('object', 'execute_kw', [
@@ -626,7 +614,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             // First create a product
             $productId = $this->callOdoo('object', 'execute_kw', [
@@ -682,7 +670,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $result = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -716,7 +704,7 @@ class OdooHelper
     {
         try {
             $config = $this->getConfig();
-            $uid = $this->authenticate();
+            $uid = $this->getUserId();
             
             $result = $this->callOdoo('object', 'execute_kw', [
                 $config['database'],
@@ -743,7 +731,20 @@ class OdooHelper
     public function getConnectionStatus()
     {
         try {
-            $uid = $this->authenticate();
+            $config = $this->getConfig();
+            $uid = $this->getUserId();
+            
+            // Test a simple call to verify connection
+            $this->callOdoo('object', 'execute_kw', [
+                $config['database'],
+                $uid,
+                $config['password'],
+                'sale.order',
+                'search',
+                [[]],
+                ['limit' => 1]
+            ]);
+            
             return [
                 'success' => true,
                 'uid' => $uid,
@@ -774,6 +775,7 @@ class OdooHelper
                 'base_url' => $config['base_url'],
                 'database' => $config['database'],
                 'username' => $config['username'],
+                'user_id' => $config['user_id'],
                 'password_set' => !empty($config['password']),
                 'password_length' => strlen($config['password'])
             ],
@@ -785,14 +787,26 @@ class OdooHelper
         
         try {
             // Test authentication
-            $diagnostics['step'] = 'authentication';
-            $uid = $this->authenticate();
-            $diagnostics['tests']['authentication'] = true;
+            $diagnostics['step'] = 'connection_test';
+            $uid = $this->getUserId();
+            
+            // Test a simple call
+            $this->callOdoo('object', 'execute_kw', [
+                $config['database'],
+                $uid,
+                $config['password'],
+                'sale.order',
+                'search',
+                [[]],
+                ['limit' => 1]
+            ]);
+            
+            $diagnostics['tests']['connection_test'] = true;
             $diagnostics['tests']['uid'] = $uid;
             $diagnostics['success'] = true;
             
         } catch (\Exception $e) {
-            $diagnostics['tests']['authentication'] = false;
+            $diagnostics['tests']['connection_test'] = false;
             $diagnostics['errors'][] = $e->getMessage();
             $diagnostics['success'] = false;
         }
