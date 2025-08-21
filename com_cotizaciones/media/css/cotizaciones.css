@@ -300,6 +300,72 @@
     }
 }
 
+/* Accessibility Improvements */
+@media (prefers-reduced-motion: reduce) {
+    .btn, .form-control, .badge {
+        transition: none !important;
+    }
+    
+    .spinner-border {
+        animation: none !important;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .quotes-ribbon {
+        border: 2px solid #000;
+    }
+    
+    .btn {
+        border-width: 2px;
+    }
+    
+    .form-control:focus {
+        border-width: 3px;
+    }
+}
+
+/* Focus indicators for better accessibility */
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* Skip link for screen readers */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: #000;
+    color: #fff;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 1000;
+}
+
+.skip-link:focus {
+    top: 6px;
+}
+
+/* Validation message styles */
+.validation-message {
+    margin-bottom: 1rem;
+    border-left: 4px solid #dc3545;
+}
+
+.form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+.form-control.is-valid {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
 /* Loading States */
 .loading {
     opacity: 0.6;

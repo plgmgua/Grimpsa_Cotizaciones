@@ -75,7 +75,6 @@
                     type="password"
                     label="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_LABEL"
                     description="COM_COTIZACIONES_CONFIG_ODOO_API_KEY_DESC"
-                    default="2386bb5ae66c7fd9022feaf82148680c4cf4ce3b"
                     required="true"
                 />
                 <field

@@ -15,6 +15,7 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Model\ListModel;
 use Joomla\CMS\Pagination\Pagination;
 use Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper;
+use Exception;
 
 /**
  * Cotizaciones model for the Cotizaciones component.

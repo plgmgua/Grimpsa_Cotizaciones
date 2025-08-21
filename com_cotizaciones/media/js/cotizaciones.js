@@ -23,26 +23,81 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Form validation enhancement
-    const form = document.getElementById('adminForm');
-    if (form && form.classList.contains('form-validate')) {
+    const forms = document.querySelectorAll('.form-validate');
+    forms.forEach(function(form) {
         form.addEventListener('submit', function(e) {
-            const requiredFields = form.querySelectorAll('.required');
+            const requiredFields = form.querySelectorAll('.required, [required]');
             let isValid = true;
+            let firstInvalidField = null;
 
             requiredFields.forEach(function(field) {
-                if (!field.value.trim()) {
+                const value = field.value.trim();
+                const fieldType = field.type;
+                
+                // Reset validation state
+                field.classList.remove('is-invalid');
+                field.classList.remove('is-valid');
+                
+                // Check if field is empty
+                if (!value) {
                     field.classList.add('is-invalid');
                     isValid = false;
+                    if (!firstInvalidField) firstInvalidField = field;
                 } else {
-                    field.classList.remove('is-invalid');
+                    // Additional validation based on field type
+                    if (fieldType === 'email' && !isValidEmail(value)) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                        if (!firstInvalidField) firstInvalidField = field;
+                    } else if (fieldType === 'number' && isNaN(value)) {
+                        field.classList.add('is-invalid');
+                        isValid = false;
+                        if (!firstInvalidField) firstInvalidField = field;
+                    } else {
+                        field.classList.add('is-valid');
+                    }
                 }
             });
 
             if (!isValid) {
                 e.preventDefault();
-                alert('Por favor complete todos los campos requeridos.');
+                if (firstInvalidField) {
+                    firstInvalidField.focus();
+                }
+                showValidationMessage('Por favor complete todos los campos requeridos correctamente.');
             }
         });
+    });
+
+    // Email validation helper
+    function isValidEmail(email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    }
+
+    // Show validation message
+    function showValidationMessage(message) {
+        // Remove existing validation messages
+        const existingMessages = document.querySelectorAll('.validation-message');
+        existingMessages.forEach(function(msg) {
+            msg.remove();
+        });
+
+        // Create new message
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'alert alert-danger validation-message';
+        messageDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message;
+        
+        // Insert at the top of the form
+        const form = document.querySelector('.form-validate');
+        if (form) {
+            form.insertBefore(messageDiv, form.firstChild);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(function() {
+                messageDiv.remove();
+            }, 5000);
+        }
     }
 
     // Partner ID validation

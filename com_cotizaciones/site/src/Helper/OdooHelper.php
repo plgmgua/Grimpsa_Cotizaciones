@@ -13,6 +13,7 @@ defined('_JEXEC') or die;
 
 use Joomla\CMS\Factory;
 use Joomla\CMS\Component\ComponentHelper;
+use Exception;
 
 /**
  * Helper class for Odoo integration using the exact working XML-RPC format
@@ -38,8 +39,17 @@ class OdooHelper
         $this->url = $params->get('odoo_url', 'https://grupoimpre.odoo.com/xmlrpc/2/object');
         $this->database = $params->get('odoo_database', 'grupoimpre');
         $this->userId = (int) $params->get('odoo_user_id', 2);
-        $this->apiKey = $params->get('odoo_api_key', '2386bb5ae66c7fd9022feaf82148680c4cf4ce3b');
+        $this->apiKey = $params->get('odoo_api_key', '');
         $this->debug = $params->get('enable_debug', 0);
+        
+        // Validate required configuration
+        if (empty($this->apiKey)) {
+            throw new Exception('Odoo API key is not configured. Please configure it in the component settings.');
+        }
+        
+        if (empty($this->url) || !filter_var($this->url, FILTER_VALIDATE_URL)) {
+            throw new Exception('Invalid Odoo URL configured. Please check the component settings.');
+        }
     }
 
     /**
@@ -1117,6 +1127,13 @@ class OdooHelper
      */
     private function makeCurlRequest($url, $xmlData)
     {
+        if (!function_exists('curl_init')) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('cURL extension is not available', 'error');
+            }
+            return false;
+        }
+
         $ch = curl_init();
         
         curl_setopt_array($ch, [
@@ -1125,22 +1142,27 @@ class OdooHelper
             CURLOPT_POSTFIELDS => $xmlData,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: text/xml',
-                'Content-Length: ' . strlen($xmlData)
+                'Content-Length: ' . strlen($xmlData),
+                'User-Agent: Joomla-Cotizaciones-Component/1.0'
             ],
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
         ]);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
+        $info = curl_getinfo($ch);
         curl_close($ch);
 
         if ($response === false || !empty($error)) {
             if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('cURL Error: ' . $error, 'error');
+                Factory::getApplication()->enqueueMessage('cURL Error: ' . $error . ' (HTTP Code: ' . $httpCode . ')', 'error');
             }
             return false;
         }
@@ -1148,6 +1170,14 @@ class OdooHelper
         if ($httpCode !== 200) {
             if ($this->debug) {
                 Factory::getApplication()->enqueueMessage('HTTP Error: ' . $httpCode . ' - Response: ' . substr($response, 0, 500), 'error');
+            }
+            return false;
+        }
+
+        // Validate response is not empty
+        if (empty($response)) {
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Empty response received from Odoo', 'error');
             }
             return false;
         }

@@ -56,6 +56,9 @@ $stateBadges = [
 ?>
 
 <div class="cotizaciones-component">
+    <!-- Skip link for accessibility -->
+    <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+    
     <div class="page-header">
         <div class="d-flex justify-content-between align-items-center">
             <h1>Mis Cotizaciones</h1>
@@ -160,7 +163,7 @@ $stateBadges = [
     </div>
 
     <!-- Quotes Table -->
-    <div class="quotes-table-container">
+    <div id="main-content" class="quotes-table-container">
         <?php if (empty($items)): ?>
             <?php if ($hasSearch || $hasStateFilter): ?>
                 <div class="alert alert-warning">

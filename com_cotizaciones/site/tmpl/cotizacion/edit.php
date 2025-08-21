@@ -67,7 +67,7 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
 
     <!-- Quote Header Form -->
     <form action="<?php echo Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=' . (int) safeGet($this->item, 'id', 0)); ?>" 
-          method="post" name="quoteForm" id="quoteForm" class="form-validate">
+          method="post" name="quoteForm" id="quoteForm" class="form-validate" novalidate>
         
         <div class="quote-form-container">
             <div class="row">
