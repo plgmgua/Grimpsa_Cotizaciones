@@ -142,6 +142,11 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     // Debug results
                                                     Factory::getApplication()->enqueueMessage('Debug: Found ' . count($clients) . ' clients', 'info');
                                                     
+                                                    // Debug first client structure if available
+                                                    if (count($clients) > 0 && is_array($clients[0])) {
+                                                        Factory::getApplication()->enqueueMessage('Debug: First client structure: ' . print_r($clients[0], true), 'info');
+                                                    }
+                                                    
                                                 } catch (Exception $e) {
                                                     Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'warning');
                                                     $clients = array();
@@ -151,8 +156,17 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                             
                                             <?php if ($selectedClient): ?>
                                                 <!-- Selected Client Display -->
+                                                <?php
+                                                // Safely extract selected client data
+                                                $selectedClientId = isset($selectedClient['id']) ? (is_array($selectedClient['id']) ? $selectedClient['id'][0] : $selectedClient['id']) : 0;
+                                                $selectedClientName = isset($selectedClient['name']) ? (is_array($selectedClient['name']) ? $selectedClient['name'][1] : $selectedClient['name']) : 'Cliente desconocido';
+                                                
+                                                // Ensure values are proper types
+                                                $selectedClientId = (int)$selectedClientId;
+                                                $selectedClientName = (string)$selectedClientName;
+                                                ?>
                                                 <div class="alert alert-success">
-                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars(isset($selectedClient['name']) ? $selectedClient['name'] : 'Cliente desconocido'); ?>
+                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars($selectedClientName); ?>
                                                     <form method="post" style="display: inline;" class="ms-2">
                                                         <button type="submit" name="clear_client" value="1" class="btn btn-sm btn-outline-secondary">
                                                             Cambiar Cliente
@@ -160,7 +174,7 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                         <?php echo HTMLHelper::_('form.token'); ?>
                                                     </form>
                                                 </div>
-                                                <input type="hidden" name="jform[partner_id]" value="<?php echo isset($selectedClient['id']) ? (int)$selectedClient['id'] : 0; ?>" required />
+                                                <input type="hidden" name="jform[partner_id]" value="<?php echo $selectedClientId; ?>" required />
                                             <?php else: ?>
                                                 <!-- Client Search Form -->
                                                 <div class="alert alert-info mb-2">
@@ -213,15 +227,28 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                                 <div class="list-group list-group-flush">
                                                                     <?php foreach ($clients as $client): ?>
                                                                         <?php if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) continue; ?>
+                                                                        <?php
+                                                                        // Safely extract client data, handling both string and array values
+                                                                        $clientId = is_array($client['id']) ? $client['id'][0] : $client['id'];
+                                                                        $clientName = is_array($client['name']) ? $client['name'][1] : $client['name'];
+                                                                        $clientEmail = isset($client['email']) ? (is_array($client['email']) ? $client['email'][1] : $client['email']) : '';
+                                                                        $clientPhone = isset($client['phone']) ? (is_array($client['phone']) ? $client['phone'][1] : $client['phone']) : '';
+                                                                        
+                                                                        // Ensure all values are strings
+                                                                        $clientId = (string)$clientId;
+                                                                        $clientName = (string)$clientName;
+                                                                        $clientEmail = (string)$clientEmail;
+                                                                        $clientPhone = (string)$clientPhone;
+                                                                        ?>
                                                                         <form method="post" style="display: inline;">
-                                                                            <button type="submit" name="selected_client_id" value="<?php echo (int)$client['id']; ?>" 
+                                                                            <button type="submit" name="selected_client_id" value="<?php echo (int)$clientId; ?>" 
                                                                                     class="list-group-item list-group-item-action text-start">
-                                                                                <strong><?php echo htmlspecialchars($client['name']); ?></strong>
-                                                                                <?php if (!empty($client['email'])): ?>
-                                                                                    <br><small class="text-muted"><?php echo htmlspecialchars($client['email']); ?></small>
+                                                                                <strong><?php echo htmlspecialchars($clientName); ?></strong>
+                                                                                <?php if (!empty($clientEmail)): ?>
+                                                                                    <br><small class="text-muted"><?php echo htmlspecialchars($clientEmail); ?></small>
                                                                                 <?php endif; ?>
-                                                                                <?php if (!empty($client['phone'])): ?>
-                                                                                    <br><small class="text-muted">📞 <?php echo htmlspecialchars($client['phone']); ?></small>
+                                                                                <?php if (!empty($clientPhone)): ?>
+                                                                                    <br><small class="text-muted">📞 <?php echo htmlspecialchars($clientPhone); ?></small>
                                                                                 <?php endif; ?>
                                                                             </button>
                                                                             <?php echo HTMLHelper::_('form.token'); ?>
