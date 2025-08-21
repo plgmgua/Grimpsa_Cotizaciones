@@ -207,16 +207,16 @@ class CotizacionModel extends AdminModel
         try {
             $helper = new OdooHelper();
             
-            // Get all clients without any filtering first
-            $allClients = $helper->getAllClients('');
+            // Get clients filtered by the current user's sales agent field
+            $filteredClients = $helper->getClients('', $user->name);
             
-            if (!is_array($allClients)) {
+            if (!is_array($filteredClients)) {
                 return [];
             }
             
             // Process and clean the client data
             $processedClients = [];
-            foreach ($allClients as $client) {
+            foreach ($filteredClients as $client) {
                 if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) {
                     continue;
                 }

@@ -100,21 +100,27 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     No se pudieron cargar los clientes. Verifique la conexión con Odoo.
                                                 </div>
                                             <?php else: ?>
-                                                <select name="jform[partner_id]" id="jform_partner_id" class="form-select" required>
-                                                    <option value="">-- Seleccionar Cliente --</option>
-                                                    <?php foreach ($availableClients as $client): ?>
-                                                        <option value="<?php echo htmlspecialchars($client['id']); ?>" 
-                                                                <?php echo ($selectedClientId == $client['id']) ? 'selected' : ''; ?>>
-                                                            <?php echo htmlspecialchars($client['name']); ?>
-                                                            <?php if (!empty($client['email'])): ?>
-                                                                (<?php echo htmlspecialchars($client['email']); ?>)
-                                                            <?php endif; ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
+                                                <div class="client-selector">
+                                                    <input type="text" id="client_search" class="form-control mb-2" 
+                                                           placeholder="Buscar cliente..." 
+                                                           autocomplete="off">
+                                                    <select name="jform[partner_id]" id="jform_partner_id" class="form-select" required>
+                                                        <option value="">-- Seleccionar Cliente --</option>
+                                                        <?php foreach ($availableClients as $client): ?>
+                                                            <option value="<?php echo htmlspecialchars($client['id']); ?>" 
+                                                                    data-search="<?php echo htmlspecialchars(strtolower($client['name'] . ' ' . $client['email'])); ?>"
+                                                                    <?php echo ($selectedClientId == $client['id']) ? 'selected' : ''; ?>>
+                                                                <?php echo htmlspecialchars($client['name']); ?>
+                                                                <?php if (!empty($client['email'])): ?>
+                                                                    (<?php echo htmlspecialchars($client['email']); ?>)
+                                                                <?php endif; ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </div>
                                                 
                                                 <small class="form-text text-muted">
-                                                    Se muestran todos los clientes disponibles. Total: <?php echo count($availableClients); ?> clientes.
+                                                    Clientes asignados a: <strong><?php echo htmlspecialchars($user->name); ?></strong>. Total: <?php echo count($availableClients); ?> clientes.
                                                 </small>
                                             <?php endif; ?>
                                         <?php else: ?>

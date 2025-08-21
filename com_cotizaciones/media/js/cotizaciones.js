@@ -170,3 +170,59 @@ function hideLoading(element) {
         }
     }
 }
+
+/**
+ * Client search functionality
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const clientSearch = document.getElementById('client_search');
+    const clientSelect = document.getElementById('jform_partner_id');
+    
+    if (clientSearch && clientSelect) {
+        clientSearch.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const options = clientSelect.querySelectorAll('option');
+            
+            options.forEach(function(option) {
+                if (option.value === '') {
+                    // Always show the placeholder option
+                    option.style.display = '';
+                    return;
+                }
+                
+                const searchData = option.getAttribute('data-search') || '';
+                const optionText = option.textContent.toLowerCase();
+                
+                if (searchTerm === '' || searchData.includes(searchTerm) || optionText.includes(searchTerm)) {
+                    option.style.display = '';
+                } else {
+                    option.style.display = 'none';
+                }
+            });
+            
+            // If search term is empty, reset to first option
+            if (searchTerm === '') {
+                clientSelect.selectedIndex = 0;
+            }
+        });
+        
+        // Clear search when select changes
+        clientSelect.addEventListener('change', function() {
+            if (clientSearch) {
+                clientSearch.value = '';
+                // Show all options again
+                const options = clientSelect.querySelectorAll('option');
+                options.forEach(function(option) {
+                    option.style.display = '';
+                });
+            }
+        });
+        
+        // Focus on search input when clicking on the select
+        clientSelect.addEventListener('click', function() {
+            if (clientSearch) {
+                clientSearch.focus();
+            }
+        });
+    }
+});

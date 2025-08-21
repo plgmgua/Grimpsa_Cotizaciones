@@ -424,6 +424,43 @@
     position: relative;
 }
 
+.client-selector #client_search {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.client-selector #client_search:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    outline: none;
+}
+
+.client-selector #jform_partner_id {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+}
+
+.client-selector #jform_partner_id:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    outline: none;
+}
+
+.client-selector option {
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+.client-selector option:hover {
+    background-color: #f8f9fa;
+}
+
 .client-results {
     position: absolute;
     top: 100%;
