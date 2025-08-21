@@ -69,7 +69,11 @@ class OdooHelper
                 $domain[] = ['name', 'ilike', $search];
             }
             
-            // First try with sales agent filter
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Searching clients with term: "' . $search . '" and agent: "' . $agentName . '"', 'info');
+            }
+            
+            // Strategy 1: Try with exact sales agent match
             if (!empty($agentName)) {
                 $filteredDomain = $domain;
                 $filteredDomain[] = ['x_studio_agente_de_ventas', '=', $agentName];
@@ -79,53 +83,67 @@ class OdooHelper
                     ['limit' => 50, 'order' => 'name asc']
                 );
                 
-                // If we found enough clients with the filter, return them
-                if (is_array($filteredClients) && count($filteredClients) >= 3) {
-                    if ($this->debug) {
-                        Factory::getApplication()->enqueueMessage('Using filtered results: ' . count($filteredClients) . ' clients found', 'info');
-                    }
-                    return $filteredClients;
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Strategy 1 (exact agent match): Found ' . (is_array($filteredClients) ? count($filteredClients) : 0) . ' clients', 'info');
                 }
                 
-                // If we found very few clients, also include clients without sales agent assignment
+                // If we found clients with exact match, return them
                 if (is_array($filteredClients) && count($filteredClients) > 0) {
-                    // Get additional clients without sales agent assignment
-                    $unassignedDomain = $domain;
-                    $unassignedDomain[] = ['x_studio_agente_de_ventas', '=', false];
-                    
-                    $unassignedClients = $this->odooCall('res.partner', 'search_read', $unassignedDomain,
-                        ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
-                        ['limit' => 20, 'order' => 'name asc']
-                    );
-                    
-                    if (is_array($unassignedClients)) {
-                        $allClients = array_merge($filteredClients, $unassignedClients);
-                        if ($this->debug) {
-                            Factory::getApplication()->enqueueMessage('Combined results: ' . count($allClients) . ' clients (filtered + unassigned)', 'info');
-                        }
-                        return $allClients;
-                    }
-                    
                     return $filteredClients;
                 }
             }
             
-            // Fallback: get all clients without sales agent filter
-            $clients = $this->odooCall('res.partner', 'search_read', $domain,
+            // Strategy 2: Try with partial sales agent match (contains)
+            if (!empty($agentName)) {
+                $partialDomain = $domain;
+                $partialDomain[] = ['x_studio_agente_de_ventas', 'ilike', $agentName];
+                
+                $partialClients = $this->odooCall('res.partner', 'search_read', $partialDomain,
+                    ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
+                    ['limit' => 50, 'order' => 'name asc']
+                );
+                
+                if ($this->debug) {
+                    Factory::getApplication()->enqueueMessage('Strategy 2 (partial agent match): Found ' . (is_array($partialClients) ? count($partialClients) : 0) . ' clients', 'info');
+                }
+                
+                if (is_array($partialClients) && count($partialClients) > 0) {
+                    return $partialClients;
+                }
+            }
+            
+            // Strategy 3: Try with unassigned clients (no sales agent)
+            $unassignedDomain = $domain;
+            $unassignedDomain[] = ['|', ['x_studio_agente_de_ventas', '=', false], ['x_studio_agente_de_ventas', '=', null]];
+            
+            $unassignedClients = $this->odooCall('res.partner', 'search_read', $unassignedDomain,
+                ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
+                ['limit' => 30, 'order' => 'name asc']
+            );
+            
+            if ($this->debug) {
+                Factory::getApplication()->enqueueMessage('Strategy 3 (unassigned clients): Found ' . (is_array($unassignedClients) ? count($unassignedClients) : 0) . ' clients', 'info');
+            }
+            
+            if (is_array($unassignedClients) && count($unassignedClients) > 0) {
+                return $unassignedClients;
+            }
+            
+            // Strategy 4: Fallback - get all clients without any sales agent filter
+            $allClients = $this->odooCall('res.partner', 'search_read', $domain,
                 ['id', 'name', 'email', 'phone', 'x_studio_agente_de_ventas'],
                 ['limit' => 50, 'order' => 'name asc']
             );
             
-            // Debug the results
             if ($this->debug) {
-                Factory::getApplication()->enqueueMessage('Fallback search - Found clients: ' . (is_array($clients) ? count($clients) : 'not array'), 'info');
+                Factory::getApplication()->enqueueMessage('Strategy 4 (all clients): Found ' . (is_array($allClients) ? count($allClients) : 0) . ' clients', 'info');
             }
             
-            if ($clients === false || !is_array($clients)) {
+            if ($allClients === false || !is_array($allClients)) {
                 return [];
             }
             
-            return $clients;
+            return $allClients;
             
         } catch (Exception $e) {
             if ($this->debug) {

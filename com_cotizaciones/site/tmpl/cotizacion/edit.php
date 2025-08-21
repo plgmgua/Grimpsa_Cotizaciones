@@ -120,12 +120,28 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
                                                     // Convert search term to lowercase for better matching
                                                     $searchTerm = trim($clientSearch);
-                                                    $clients = $helper->getClients($searchTerm, $user->name);
+                                                    
+                                                    // Check if we should test without agent filter
+                                                    $testAllClients = $app ? $app->input->getBool('test_all_clients', false) : false;
+                                                    
+                                                    if ($testAllClients) {
+                                                        // Test search without agent filter
+                                                        Factory::getApplication()->enqueueMessage('Debug: Testing search without agent filter for "' . $searchTerm . '"', 'info');
+                                                        $clients = $helper->getAllClients($searchTerm);
+                                                    } else {
+                                                        // Normal search with agent filter
+                                                        Factory::getApplication()->enqueueMessage('Debug: Searching for "' . $searchTerm . '" with agent "' . $user->name . '"', 'info');
+                                                        $clients = $helper->getClients($searchTerm, $user->name);
+                                                    }
                                                     
                                                     // Ensure clients is an array
                                                     if (!is_array($clients)) {
                                                         $clients = array();
                                                     }
+                                                    
+                                                    // Debug results
+                                                    Factory::getApplication()->enqueueMessage('Debug: Found ' . count($clients) . ' clients', 'info');
+                                                    
                                                 } catch (Exception $e) {
                                                     Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'warning');
                                                     $clients = array();
@@ -168,6 +184,18 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                                     </div>
                                                     <?php echo HTMLHelper::_('form.token'); ?>
                                                 </form>
+                                                
+                                                <!-- Debug: Test search without agent filter -->
+                                                <?php if (empty($clients) && !empty($clientSearch)): ?>
+                                                    <div class="mt-2">
+                                                        <form method="post" style="display: inline;">
+                                                            <button type="submit" name="test_all_clients" value="1" class="btn btn-sm btn-outline-warning">
+                                                                <i class="fas fa-bug"></i> Probar búsqueda sin filtro de agente
+                                                            </button>
+                                                            <?php echo HTMLHelper::_('form.token'); ?>
+                                                        </form>
+                                                    </div>
+                                                <?php endif; ?>
                                                 
                                                 <?php if (!empty($clientSearch)): ?>
                                                     <?php if (empty($clients)): ?>
