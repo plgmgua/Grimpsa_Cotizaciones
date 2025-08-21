@@ -14,6 +14,7 @@ defined('_JEXEC') or die;
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Model\AdminModel;
 use Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper;
+use Exception;
 
 /**
  * Cotizacion model for the Cotizaciones component.
@@ -188,6 +189,74 @@ class CotizacionModel extends AdminModel
         }
 
         return $data;
+    }
+
+    /**
+     * Method to get all available clients for the current user.
+     *
+     * @return  array  Array of clients.
+     */
+    public function getAvailableClients()
+    {
+        $user = Factory::getUser();
+        
+        if ($user->guest) {
+            return [];
+        }
+
+        try {
+            $helper = new OdooHelper();
+            
+            // Get all clients without any filtering first
+            $allClients = $helper->getAllClients('');
+            
+            if (!is_array($allClients)) {
+                return [];
+            }
+            
+            // Process and clean the client data
+            $processedClients = [];
+            foreach ($allClients as $client) {
+                if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) {
+                    continue;
+                }
+                
+                // Safely extract client data
+                $clientId = is_array($client['id']) ? $client['id'][0] : $client['id'];
+                $clientName = is_array($client['name']) ? $client['name'][1] : $client['name'];
+                $clientEmail = isset($client['email']) ? (is_array($client['email']) ? $client['email'][1] : $client['email']) : '';
+                $clientPhone = isset($client['phone']) ? (is_array($client['phone']) ? $client['phone'][1] : $client['phone']) : '';
+                
+                // Ensure all values are strings
+                $clientId = (string)$clientId;
+                $clientName = (string)$clientName;
+                $clientEmail = (string)$clientEmail;
+                $clientPhone = (string)$clientPhone;
+                
+                // Skip if name is empty
+                if (empty($clientName)) {
+                    continue;
+                }
+                
+                $processedClients[] = [
+                    'id' => $clientId,
+                    'name' => $clientName,
+                    'email' => $clientEmail,
+                    'phone' => $clientPhone
+                ];
+            }
+            
+            // Sort by name
+            usort($processedClients, function($a, $b) {
+                return strcasecmp($a['name'], $b['name']);
+            });
+            
+            return $processedClients;
+            
+        } catch (Exception $e) {
+            Factory::getApplication()->enqueueMessage('Error loading clients: ' . $e->getMessage(), 'warning');
+            return [];
+        }
     }
 
     /**

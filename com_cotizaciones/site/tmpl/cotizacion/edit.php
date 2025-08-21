@@ -83,192 +83,40 @@ $editLineId = $app ? $app->input->getInt('edit_line_id', 0) : 0;
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <?php if ($isNew): ?>
-                                            <label for="client_search" class="form-label">
+                                            <label for="jform_partner_id" class="form-label">
                                                 Cliente *
                                             </label>
                                             
-                                            <?php 
-                                            // Clear client selection
-                                            if ($app && $app->input->post->get('clear_client')) {
-                                                // Redirect to clear the POST data
-                                                $app->redirect(Route::_('index.php?option=com_cotizaciones&view=cotizacion&layout=edit&id=0'));
-                                                return;
-                                            }
-                                            
-                                            // Get search term and clients
-                                            $clientSearch = $app ? $app->input->getString('client_search', '') : '';
-                                            $selectedClientId = $app ? $app->input->getInt('selected_client_id', 0) : 0;
-                                            $clients = array();
-                                            $selectedClient = null;
-                                            
-                                            // If we have a selected client, get its info
-                                            if ($selectedClientId > 0) {
-                                                try {
-                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                                                    $clientInfo = $helper->getClientById($selectedClientId);
-                                                    if ($clientInfo && is_array($clientInfo)) {
-                                                        $selectedClient = $clientInfo;
-                                                    }
-                                                } catch (Exception $e) {
-                                                    Factory::getApplication()->enqueueMessage('Error loading selected client: ' . $e->getMessage(), 'warning');
-                                                }
-                                            }
-                                            
-                                            // If we have a search term, get matching clients
-                                            if (!empty($clientSearch) && strlen($clientSearch) >= 2) {
-                                                try {
-                                                    $helper = new \Grimpsa\Component\Cotizaciones\Site\Helper\OdooHelper();
-                                                    // Convert search term to lowercase for better matching
-                                                    $searchTerm = trim($clientSearch);
-                                                    
-                                                    // Check if we should test without agent filter
-                                                    $testAllClients = $app ? $app->input->getBool('test_all_clients', false) : false;
-                                                    
-                                                    if ($testAllClients) {
-                                                        // Test search without agent filter
-                                                        Factory::getApplication()->enqueueMessage('Debug: Testing search without agent filter for "' . $searchTerm . '"', 'info');
-                                                        $clients = $helper->getAllClients($searchTerm);
-                                                    } else {
-                                                        // Normal search with agent filter
-                                                        Factory::getApplication()->enqueueMessage('Debug: Searching for "' . $searchTerm . '" with agent "' . $user->name . '"', 'info');
-                                                        $clients = $helper->getClients($searchTerm, $user->name);
-                                                    }
-                                                    
-                                                    // Ensure clients is an array
-                                                    if (!is_array($clients)) {
-                                                        $clients = array();
-                                                    }
-                                                    
-                                                    // Debug results
-                                                    Factory::getApplication()->enqueueMessage('Debug: Found ' . count($clients) . ' clients', 'info');
-                                                    
-                                                    // Debug first client structure if available
-                                                    if (count($clients) > 0 && is_array($clients[0])) {
-                                                        Factory::getApplication()->enqueueMessage('Debug: First client structure: ' . print_r($clients[0], true), 'info');
-                                                    }
-                                                    
-                                                } catch (Exception $e) {
-                                                    Factory::getApplication()->enqueueMessage('Error searching clients: ' . $e->getMessage(), 'warning');
-                                                    $clients = array();
-                                                }
-                                            }
+                                            <?php
+                                            // Get all available clients from the model
+                                            $model = $this->getModel();
+                                            $availableClients = $model->getAvailableClients();
+                                            $selectedClientId = $app ? $app->input->getInt('jform_partner_id', 0) : 0;
                                             ?>
                                             
-                                            <?php if ($selectedClient): ?>
-                                                <!-- Selected Client Display -->
-                                                <?php
-                                                // Safely extract selected client data
-                                                $selectedClientId = isset($selectedClient['id']) ? (is_array($selectedClient['id']) ? $selectedClient['id'][0] : $selectedClient['id']) : 0;
-                                                $selectedClientName = isset($selectedClient['name']) ? (is_array($selectedClient['name']) ? $selectedClient['name'][1] : $selectedClient['name']) : 'Cliente desconocido';
-                                                
-                                                // Ensure values are proper types
-                                                $selectedClientId = (int)$selectedClientId;
-                                                $selectedClientName = (string)$selectedClientName;
-                                                ?>
-                                                <div class="alert alert-success">
-                                                    <strong>Cliente seleccionado:</strong> <?php echo htmlspecialchars($selectedClientName); ?>
-                                                    <form method="post" style="display: inline;" class="ms-2">
-                                                        <button type="submit" name="clear_client" value="1" class="btn btn-sm btn-outline-secondary">
-                                                            Cambiar Cliente
-                                                        </button>
-                                                        <?php echo HTMLHelper::_('form.token'); ?>
-                                                    </form>
+                                            <?php if (empty($availableClients)): ?>
+                                                <div class="alert alert-warning">
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    No se pudieron cargar los clientes. Verifique la conexión con Odoo.
                                                 </div>
-                                                <input type="hidden" name="jform[partner_id]" value="<?php echo $selectedClientId; ?>" required />
                                             <?php else: ?>
-                                                <!-- Client Search Form -->
-                                                <div class="alert alert-info mb-2">
-                                                    <i class="fas fa-info-circle"></i>
-                                                    <small>La búsqueda de clientes está filtrada por su agente de ventas: <strong><?php echo htmlspecialchars($user->name); ?></strong></small>
-                                                </div>
-                                                <form method="post" class="mb-2">
-                                                    <div class="input-group">
-                                                        <input type="text" name="client_search" class="form-control" 
-                                                               value="<?php echo htmlspecialchars($clientSearch); ?>"
-                                                               placeholder="Buscar cliente por nombre (filtrado por su agente de ventas)..." 
-                                                               minlength="2" />
-                                                        <button type="submit" class="btn btn-outline-primary">
-                                                            <i class="fas fa-search"></i> Buscar
-                                                        </button>
-                                                        <?php if (!empty($clientSearch)): ?>
-                                                            <button type="submit" name="clear_search" value="1" class="btn btn-outline-secondary">
-                                                                <i class="fas fa-times"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                    <?php echo HTMLHelper::_('form.token'); ?>
-                                                </form>
+                                                <select name="jform[partner_id]" id="jform_partner_id" class="form-select" required>
+                                                    <option value="">-- Seleccionar Cliente --</option>
+                                                    <?php foreach ($availableClients as $client): ?>
+                                                        <option value="<?php echo htmlspecialchars($client['id']); ?>" 
+                                                                <?php echo ($selectedClientId == $client['id']) ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars($client['name']); ?>
+                                                            <?php if (!empty($client['email'])): ?>
+                                                                (<?php echo htmlspecialchars($client['email']); ?>)
+                                                            <?php endif; ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
                                                 
-                                                <!-- Debug: Test search without agent filter -->
-                                                <?php if (empty($clients) && !empty($clientSearch)): ?>
-                                                    <div class="mt-2">
-                                                        <form method="post" style="display: inline;">
-                                                            <button type="submit" name="test_all_clients" value="1" class="btn btn-sm btn-outline-warning">
-                                                                <i class="fas fa-bug"></i> Probar búsqueda sin filtro de agente
-                                                            </button>
-                                                            <?php echo HTMLHelper::_('form.token'); ?>
-                                                        </form>
-                                                    </div>
-                                                <?php endif; ?>
-                                                
-                                                <?php if (!empty($clientSearch)): ?>
-                                                    <?php if (empty($clients)): ?>
-                                                        <div class="alert alert-warning">
-                                                            <i class="fas fa-exclamation-triangle"></i>
-                                                            No se encontraron clientes que contengan "<?php echo htmlspecialchars($clientSearch); ?>" en su nombre
-                                                            <br><small class="text-muted">La búsqueda no distingue entre mayúsculas y minúsculas, busca coincidencias parciales y está filtrada por su agente de ventas</small>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="card">
-                                                            <div class="card-header">
-                                                                <small>Resultados para "<?php echo htmlspecialchars($clientSearch); ?>" (<?php echo count($clients); ?> encontrados):</small>
-                                                            </div>
-                                                            <div class="card-body p-0">
-                                                                <div class="list-group list-group-flush">
-                                                                    <?php foreach ($clients as $client): ?>
-                                                                        <?php if (!is_array($client) || !isset($client['id']) || !isset($client['name'])) continue; ?>
-                                                                        <?php
-                                                                        // Safely extract client data, handling both string and array values
-                                                                        $clientId = is_array($client['id']) ? $client['id'][0] : $client['id'];
-                                                                        $clientName = is_array($client['name']) ? $client['name'][1] : $client['name'];
-                                                                        $clientEmail = isset($client['email']) ? (is_array($client['email']) ? $client['email'][1] : $client['email']) : '';
-                                                                        $clientPhone = isset($client['phone']) ? (is_array($client['phone']) ? $client['phone'][1] : $client['phone']) : '';
-                                                                        
-                                                                        // Ensure all values are strings
-                                                                        $clientId = (string)$clientId;
-                                                                        $clientName = (string)$clientName;
-                                                                        $clientEmail = (string)$clientEmail;
-                                                                        $clientPhone = (string)$clientPhone;
-                                                                        ?>
-                                                                        <form method="post" style="display: inline;">
-                                                                            <button type="submit" name="selected_client_id" value="<?php echo (int)$clientId; ?>" 
-                                                                                    class="list-group-item list-group-item-action text-start">
-                                                                                <strong><?php echo htmlspecialchars($clientName); ?></strong>
-                                                                                <?php if (!empty($clientEmail)): ?>
-                                                                                    <br><small class="text-muted"><?php echo htmlspecialchars($clientEmail); ?></small>
-                                                                                <?php endif; ?>
-                                                                                <?php if (!empty($clientPhone)): ?>
-                                                                                    <br><small class="text-muted">📞 <?php echo htmlspecialchars($clientPhone); ?></small>
-                                                                                <?php endif; ?>
-                                                                            </button>
-                                                                            <?php echo HTMLHelper::_('form.token'); ?>
-                                                                        </form>
-                                                                    <?php endforeach; ?>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                <?php endif; ?>
-                                                
-                                                <!-- Hidden field for form validation -->
-                                                <input type="hidden" name="jform[partner_id]" value="" />
+                                                <small class="form-text text-muted">
+                                                    Se muestran todos los clientes disponibles. Total: <?php echo count($availableClients); ?> clientes.
+                                                </small>
                                             <?php endif; ?>
-                                            
-                                            <small class="form-text text-muted">
-                                                <?php if (!$selectedClient): ?>
-                                                    Busque entre sus clientes asignados (mínimo 2 caracteres, no importa mayúsculas/minúsculas)
-                                                <?php endif; ?>
-                                            </small>
                                         <?php else: ?>
                                             <label for="jform_client_name" class="form-label">
                                                 Cliente
